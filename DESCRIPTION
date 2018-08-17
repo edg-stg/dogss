@@ -11,3 +11,5 @@ Encoding: UTF-8
 LazyData: true
 URL: https://github.com/edgarst/dogss
 BugReports: https://github.com/edgarst/dogss/issues
+LinkingTo: Rcpp, RcppEigen
+Imports: Rcpp, RcppEigen
