@@ -1,23 +1,11 @@
 sigmoid <- function(x) {
-    # if (type=='exact') {
     y <- double(length(x))
     logic <- (x >= 0)
-    # yes <- 1/(1 + exp(-x))
-    z <- exp(x[!logic])  # z <- exp(x)
-    # no <- z/(1+z)
-    y[logic] <- 1/(1 + exp(-x[logic]))  # yes[logic]
-    y[!logic] <- z/(1 + z)  # no[!logic]
+    z <- exp(x[!logic])
+    y[logic] <- 1/(1 + exp(-x[logic]))
+    y[!logic] <- z/(1 + z)
     return(y)
-    # } else if (type=='poly') {# approximation with polynomial kind of y <-
-    # double(length(x)) logic <- (x>=16) y[logic] <- 1 tmp <-
-    # 1-0.0625*x[!logic] tmp <- tmp*tmp tmp <- tmp*tmp tmp <- tmp*tmp tmp <-
-    # tmp*tmp y[!logic] <- 1/(1+tmp) return(y) # } else {# crude approximation
-    # with abs return(0.5*(x/(1+abs(x)))+0.5) }
 }
-
-# Sigmoid(float signal) (sigmoid(4x)!!!!)  { if (signal >= 4f) return 1f;
-# float tmp = 1f - 0.25f * signal; tmp *= tmp; tmp *= tmp; tmp *= tmp; tmp
-# *= tmp; return 1f / (1f + tmp); }
 
 logit <- function(x) log(x/(1 - x))
 
@@ -29,7 +17,7 @@ expandMatrix <- function(data, maxdelay) {
     X <- matrix(0, nrow = Tdelayed, ncol = G * maxdelay)
     for (j in 1:maxdelay) {
         for (j2 in 1:G) {
-            X[, (j2 - 1) * maxdelay + j] <- data[c((maxdelay - j + 1):(Times - 
+            X[, (j2 - 1) * maxdelay + j] <- data[c((maxdelay - j + 1):(Times -
                 j)), j2]
         }
     }
