@@ -41,11 +41,30 @@ We show how to simulate data for signal recovery. This data will be used in the 
 First we set the parameters for simulation. We will also set a seed to produce exactly the needle plot like in the publication:
 
 ```{r parameters}
-m <- 30; p <- 50; nG <- 10; k <- 10; sigma0 <- 1
+m <- 30; p <- 50; nG <- 10; nzG <- 3; k <- 10; sigma0 <- 1
 set.seed(2670)
 ```
 
 Here **m** is the number of observations, **p** is the number of features, **nG** is the number of groups, **k** is the number of non-zero coefficients and **sigma0** refers to the noise we will add in the end.
+
+```{r}
+sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
+  betas <- rep(0, p)
+  G <- sort(sample(1:nG, p, replace=TRUE))
+  while (sum(!(1:nG %in% G)) > 0) { # this makes sure we have exactly nG groups
+    G <- sort(sample(1:nG, p, replace=TRUE))
+  }
+  
+  nngroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
+  
+  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  nzgroups <- sample(1:nG, nzG)
+  whichbeta <- which(G%in%nzgroups)
+  betas[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5)
+  Y <- as.vector(X %*% betas) + rnorm(m, 0, sigma0)
+}
+```
+
 
 ## Needle plot
 
@@ -53,23 +72,6 @@ contents (F2)
 
 ```{r figure2, fig.height=6, fig.width=7}
 results <- list()
-betas <- rep(0, p)
-
-G <- sort(sample(1:nG, p, replace=TRUE))
-
-while (sum(!(1:nG %in% G)) > 0) {
-  G <- sort(sample(1:nG, p, replace=TRUE))
-}
-
-groups <- unique(G)
-ngroups <- length(groups)
-nngroups <- sapply(groups, function(g) sum(G==g))
-
-X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
-threegroups <- sample(1:ngroups, 3)
-whichbeta <- which(G%in%threegroups)
-betas[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5)
-Y <- as.vector(X %*% betas) + rnorm(m, 0, sigma0)
 
 results$dogss <- cv_dogss(X,Y,G)
 results$ssep <- cv_dogss(X,Y,G=NULL) 
