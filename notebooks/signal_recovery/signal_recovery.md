@@ -35,7 +35,7 @@ Furthermore we need to load three R files with additional code:
 
 ``` r
 source("../auxiliary_rfunctions/my_BSGSSS.R") # MBSGS package has a problem with groups of size 1
-source("../auxiliary_rfunctions/my_cvSGL.R") # SGL package does a weird cross validation, this is cv similar to gglasso/glmnet package
+source("../auxiliary_rfunctions/my_cvSGL.R") # proper cross validation for SGL package
 
 source("../auxiliary_rfunctions/my_theme.R") # functions to adjust ggplots
 ```
@@ -45,14 +45,33 @@ Simulation
 
 We show how to simulate data for signal recovery. This data will be used in the next section.
 
-First we set the parameters for simulation. We will also set a seed to produce exactly the needle plot like in the publication:
+First we set the parameters for simulation:
 
 ``` r
-m <- 30; p <- 50; nG <- 10; k <- 10; sigma0 <- 1
-set.seed(2670)
+m <- 30; p <- 50; nG <- 10; nzG <- 3; k <- 10; sigma0 <- 1
 ```
 
 Here **m** is the number of observations, **p** is the number of features, **nG** is the number of groups, **k** is the number of non-zero coefficients and **sigma0** refers to the noise we will add in the end.
+
+``` r
+sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
+  beta <- rep(0, p)
+  G <- sort(sample(1:nG, p, replace=TRUE))
+  while (sum(!(1:nG %in% G)) > 0) { # this makes sure we have exactly nG groups
+    G <- sort(sample(1:nG, p, replace=TRUE))
+  }
+  
+  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
+  whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
+  beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
+  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
+  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  return(sim)
+}
+```
+
+It might happen that we have less than **k** non-zero coefficients if the **nzG** groups have together less than **k** elements.
 
 Needle plot
 -----------
@@ -60,25 +79,12 @@ Needle plot
 contents (F2)
 
 ``` r
+sim <- sim_signalrecovery(m, p, nG, nzG, k, sigma0)
+X <- sim$X; Y <- sim$Y; beta <- sim$beta; G <- sim$G
+nngroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
+
 results <- list()
-betas <- rep(0, p)
-
-G <- sort(sample(1:nG, p, replace=TRUE))
-
-while (sum(!(1:nG %in% G)) > 0) {
-  G <- sort(sample(1:nG, p, replace=TRUE))
-}
-
-groups <- unique(G)
-ngroups <- length(groups)
-nngroups <- sapply(groups, function(g) sum(G==g))
-
-X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
-threegroups <- sample(1:ngroups, 3)
-whichbeta <- which(G%in%threegroups)
-betas[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5)
-Y <- as.vector(X %*% betas) + rnorm(m, 0, sigma0)
-
+  
 results$dogss <- cv_dogss(X,Y,G)
 results$ssep <- cv_dogss(X,Y,G=NULL) 
 results$lasso <- cv.glmnet(x=X, y=Y, intercept=FALSE, standardize=FALSE)
@@ -99,7 +105,7 @@ mydata_signal <- data.frame(
     results$gglasso$gglasso.fit$beta[, index_gglasso], 
     results$lasso$glmnet.fit$beta[, index_lasso], 
     results$bsgsss$pos_median,
-    betas
+    beta
   ),
   G=as.factor(rep(G,times=7)),
   method=factor(rep(c("dogss", "ssep", "sgl" , "gglasso", "lasso", "bsgsss", "original"), each=p), levels=c("dogss", "ssep", "sgl" , "gglasso", "lasso", "bsgsss", "original"), ordered=TRUE)
@@ -109,7 +115,7 @@ ggplot(mydata_signal, aes(colour=G, x=index, ymax=BETAS, ymin=0)) +
   facet_wrap(~ method, nrow=4, ncol=2) +
   geom_linerange(size=1.3)  +
   scale_colour_manual(values=rep(Ed_palette,length.out=p)) +
-  scale_x_continuous(breaks = c(0.5, cumsum(nngroups[1:(ngroups)])+0.5), expand=c(0,1)) +
+  scale_x_continuous(breaks = c(0.5, cumsum(nngroups[1:(nG)])+0.5), expand=c(0,1)) +
   labs(colour = "group", x="index of coefficient", y="value of coefficient") +
   theme_Ed() + theme(plot.title = element_blank(), legend.position = "top", axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.line.x =element_blank())
 ```
