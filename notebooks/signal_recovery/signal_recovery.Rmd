@@ -132,19 +132,206 @@ ggplot(mydata_signal, aes(colour=G, x=index, ymax=BETAS, ymin=0)) +
 
 ## Three scenarios for feature selection
 
-contents (F3-5)
+Now we will consider three different scenarios for the signal recovery (that is, three different sets of parameters). We will repeat the procedure above for all three sets of parameters, but for each set also repeat 100 times and aggregate the results. Aggregation is done along the AUROC and AUPR measure which are based on the rates of truely/falsely recovered edges, see paper for more detailed explanation, and the computing time needed for calculations, as well as the predictive performance on an additional simulated 100 data points with the same vector of coefficients.
+
+**nzG=3** and **sigma0=1** in all three scenarios.
+
+```{r}
+nzG <- 3; sigma0 <- 1
+```
+
+
+Please note that these codes will run for long times (mostly because of the Gibbs sampling based **BSGSSS** method), and as such I strongly recommend that you use parallelization, which I implemented using the following packages:
+
+```{r}
+library(foreach)
+library(doParallel)
+
+B <- 100 # number of simulations
+ncores <- 50 # number of cores used for parallelization
+```
+
+To generate the data of many simulations with parallelization we will use the following function:
+
+```{r}
+parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
+  
+  ncl <- detectCores()
+  ncl <- min(ncl, ncores)
+  
+  myCluster <- makeCluster(ncl)
+  registerDoParallel(myCluster)
+  
+  results <- foreach (b=1:B, .packages=c("dogss", "gglasso", "SGL", "glmnet", "MBSGS", "DescTools")) %dopar% {
+    sim <- sim_signalrecovery(m, p, nG, nzG, k, sigma0)
+    
+    X <- sim$X; Y <- sim$Y; beta <- sim$beta; G <- sim$G
+    sizegroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
+    
+    # test data for the prediction
+    X.test <- matrix(rnorm(100*p), nrow=100, ncol=p)
+    Y.test <- as.vector(X.test %*% beta) + rnorm(100, 0, sigma0)
+    
+    # calculate lambda path to make the lasso approaches comparable (based on standard lasso):
+    lambda_max <- max(abs(colSums(X*Y)))/m
+    lambdapath <- round(exp(seq(log(lambda_max), log(lambda_max*0.0001),
+                                length.out = 100)), digits = 10)
+    
+    times <- rep(0, 6)
+    names(times) <- c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss") 
+    
+    # run all 6 methods while saving their computing time
+    times["dogss"] <- system.time(results_dogss <- cv_dogss(X,Y,G))[1] 
+    times["ssep"] <- system.time(results_ssep <- cv_dogss(X,Y,G=NULL))[1] 
+    times["sgl"] <- system.time(results_sgl <- my_cvSGL(data=list(x=X,y=Y),index=G, standardize=FALSE, lambdas = lambdapath, thresh=thresh, maxit=maxit_lassos))[1]
+    times["gglasso"] <- system.time(results_gglasso <- cv.gglasso(x=X, y=Y, group=G, nfolds=10, intercept=FALSE, lambda = lambdapath, eps=thresh, maxit=maxit_lassos))[1] 
+    times["lasso"] <- system.time(results_lasso <- cv.glmnet(x=X, y=Y, intercept=FALSE, standardize=FALSE, lambda = lambdapath, thresh=thresh, maxit=maxit_lassos))[1] 
+    times["bsgsss"] <- system.time(results_bsgsss <- my_BSGSSS(Y=Y, X=X, group_size=nngroups))[1]
+    
+    TPR <- matrix(0, nrow=length(G), ncol=6, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+    FPR <- matrix(0, nrow=length(G), ncol=6, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+    Prec <- matrix(0, nrow=length(G), ncol=6, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+    
+    rankedlist <- matrix(0, nrow=length(G), ncol=6, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+    
+    # get the ranked lists of coefficients along their probabilities (dogss, ssep, bsgsss) or lambda values (lasso, gglasso, sgl)
+    rankedlist[, "dogss"] <- rank(1-results_dogss$p_final, ties="min")
+    rankedlist[, "ssep"] <- rank(1-results_ssep$p_final, ties="min")
+    rankedlist[, "sgl"] <- rank(apply(results_sgl$fit$beta, 1, function(b) ifelse(sum(b!=0)!=0, which.max(b!=0), Inf)), ties.method="min")
+    rankedlist[, "gglasso"] <- rank(apply(results_gglasso$gglasso.fit$beta, 1, function(b) ifelse(sum(b!=0)!=0, which.max(b!=0), Inf)), ties.method="min")
+    rankedlist[, "lasso"] <- rank(apply(results_lasso$glmnet.fit$beta, 1, function(b) ifelse(sum(b!=0)!=0, which.max(b!=0), Inf)), ties.method="min")
+    rankedlist[, "bsgsss"] <- rank(1-results_bsgsss$p_final, ties="min")
+    
+    # true/false positive rates and precision are calculated along the ranked list of coeffcients versus the gold standard (beta)
+    for (r in 1:dim(rankedlist)[1]) {
+      TPR[r, ] <- apply(rankedlist, 2, function(s) sum(beta[s<=r]!=0))
+      FPR[r, ] <- apply(rankedlist, 2, function(s) sum(beta[s<=r]==0))
+      Prec[r, ] <- TPR[r, ]/apply(rankedlist, 2, function(s) sum(s<=r))
+    }
+    TPR <- TPR/sum(beta!=0)
+    FPR <- FPR/sum(beta==0)
+    
+    # function AUC from DescTools calculates the Area Under the ROC or PR curve:
+    AUROC <- sapply(c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"), function(m) AUC(c(0,FPR[, m],1), c(0,TPR[, m],1)))
+    AUPR <- sapply(c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"), function(m) AUC(c(0,TPR[, m],1), c(1,Prec[, m],0)))
+    
+    # calculate pred error of Y on test data with the cross validated coefficient vectors:
+    prederror <- rep(0, 6)
+    names(prederror) <- c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")
+    normY.test <- sum(Y.test^2)
+    prederror["dogss"] <- sum((X.test%*%results_dogss$m_cv-Y.test)^2)/normY.test
+    prederror["ssep"] <- sum((X.test%*%results_ssep$m_cv-Y.test)^2)/normY.test
+    prederror["sgl"] <- sum((X.test%*%results_sgl$beta-Y.test)^2)/normY.test
+    prederror["gglasso"] <- sum((X.test%*%results_gglasso$gglasso.fit$beta[, which(results_gglasso$lambda==results_gglasso$lambda.1se)]-Y.test)^2)/normY.test
+    prederror["lasso"] <- sum((X.test%*%results_lasso$glmnet.fit$beta[, which(results_lasso$lambda==results_lasso$lambda.1se)]-Y.test)^2)/normY.test
+    prederror["bsgsss"] <- sum((X.test%*%results_bsgsss$pos_median-Y.test)^2)/normY.test
+    
+    list(AUROC=AUROC, AUPR=AUPR, prederror=prederror, times=times)
+  }
+  
+  stopCluster(myCluster)
+  
+  return(results)
+}
+```
+
+I provide the necessary data from my simulations to reconstruct the publication's plots. I will give the code that generated this data, but this code is marked to not be evaluated in this markdown file, instead only the side-loading of the RData-files is enabled. Feel free to re-run the generating code chunks on your local cluster!
 
 ### small
 
-contents
+Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). This code generated the necessary data for the plots (again, this code is set to not be evaluated within this markdown file):
+
+```{r, eval=FALSE}
+results_small <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B)
+```
+
+This is the code that generated Figure 3:
+
+```{r}
+auroc <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$AUROC)))
+    aupr <- auroc
+    prederror <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$prederror)))
+    times <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$times)))
+
+    for (b in 1:B) {
+      auroc[b, ] <- results[[b]]$onetwothree[[i]]$AUROC
+      aupr[b, ] <- results[[b]]$onetwothree[[i]]$AUPR
+      prederror[b, ] <- results[[b]]$onetwothree[[i]]$prederror
+      times[b, ] <- results[[b]]$onetwothree[[i]]$times
+    }
+
+    data <- data.frame(melt(auroc), measure="auroc")
+    data <- rbind(data, data.frame(melt(aupr), measure="aupr"))
+    data <- rbind(data, data.frame(melt(prederror), measure="prederror"))
+    data <- rbind(data, data.frame(melt(times), measure="times"))
+    data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"))
+
+    auroc_data <- subset(data, measure=="auroc")
+    P_auroc <- ggplot(auroc_data, aes(x=method, y=value)) +
+      geom_boxplot() +
+      theme_Ed() +
+      scale_colour_Ed() +
+      ylim(0,1) +
+      labs(y="AUROC") +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank())
+    Pd_auroc <- ggplot_build(P_auroc)$data[[1]]
+    P_auroc <- P_auroc + geom_segment(data=Pd_auroc, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+
+    aupr_data <- subset(data, measure=="aupr")
+    P_aupr <- ggplot(aupr_data, aes(x=method, y=value)) +
+      geom_boxplot() +
+      theme_Ed() +
+      scale_colour_Ed() +
+      ylim(0,1) +
+      labs(y="AUPR") +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank())
+    Pd_aupr <- ggplot_build(P_aupr)$data[[1]]
+    P_aupr <- P_aupr + geom_segment(data=Pd_aupr, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+
+    prederror_data <- subset(data, measure=="prederror")
+    P_prederror <- ggplot(prederror_data, aes(x=method, y=value)) +
+      geom_boxplot() +
+      theme_Ed() +
+      scale_colour_Ed() +
+      ylim(0,1) +
+      # scale_y_log10() +
+      labs(y="pred. error") +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank())
+    Pd_prederror <- ggplot_build(P_prederror)$data[[1]]
+    P_prederror <- P_prederror + geom_segment(data=Pd_prederror, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+
+    times_data <- subset(data, measure=="times")
+    P_times <- ggplot(times_data, aes(x=method, y=value)) +
+      geom_boxplot() +
+      theme_Ed() +
+      scale_colour_Ed() +
+      labs(y="time (log-scale)") +
+      theme(axis.title.x=element_blank(),
+            axis.text.x=element_blank(),
+            axis.ticks.x=element_blank())
+    Pd_times <- ggplot_build(P_times)$data[[1]]
+    P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
+
+    pdf(paste0('sim1_', i, '.pdf'), width=9, height=8.5,onefile = FALSE)
+    grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
+    dev.off()
+    embed_fonts(paste0('sim1_', i, '.pdf'), outfile=paste0('sim1_', i, '_embed.pdf'))
+```
+
 
 ### medium
 
-contents
+Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients).
 
 ### large
 
-contents
+Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients).
 
 ## Noise
 
