@@ -328,7 +328,6 @@ P_times <- ggplot(times_data, aes(x=method, y=value)) +
 Pd_times <- ggplot_build(P_times)$data[[1]]
 P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
 
-pdf(paste0('sim1_', i, '.pdf'), width=9, height=8.5,onefile = FALSE)
 grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
 ```
 
