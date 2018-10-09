@@ -6,7 +6,7 @@ Edgar Steiger
 -   [Simulation](#simulation)
 -   [Comparison of methods - Needle plot](#comparison-of-methods---needle-plot)
 -   [Three scenarios for feature selection](#three-scenarios-for-feature-selection)
-    -   [small](#small)
+    -   [small, medium and large signal recovery problems](#small-medium-and-large-signal-recovery-problems)
     -   [medium](#medium)
     -   [large](#large)
 -   [Noise](#noise)
@@ -158,16 +158,12 @@ Please note that these codes will run for long times (mostly because of the Gibb
 ``` r
 library(foreach)
 library(doParallel)
-```
 
-    ## Loading required package: iterators
-
-    ## Loading required package: parallel
-
-``` r
 B <- 100 # number of simulations
 ncores <- 50 # number of cores used for parallelization
 ```
+
+Furthermore I specified the number of simulations (**B**) and the number of cores (**ncores**) for the parallelization.
 
 To generate the data of many simulations with parallelization we will use the following function:
 
@@ -255,91 +251,97 @@ parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
 
 I provide the necessary data from my simulations to reconstruct the publication's plots. I will give the code that generated this data, but this code is marked to not be evaluated in this markdown file, instead only the side-loading of the RData-files is enabled. Feel free to re-run the generating code chunks on your local cluster!
 
-### small
+### small, medium and large signal recovery problems
 
-Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). This code generated the necessary data for the plots (again, this code is set to not be evaluated within this markdown file):
+Here we will compare the different methods on three different problems. This code generated the necessary data for the plots (again, this code is set to *not* be evaluated within this markdown file):
 
 ``` r
-results_small <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B)
+results_sr <- list()
+results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B)
+results_sr[[2]]
+results_sr[[3]]
 ```
 
-This is the code that generated Figure 3:
+Instead, we load the data:
+
+``` r
+load("results_sr_sml.RData")
+```
+
+This is the code that generated Figures 3, 4 and 5:
 
 ``` r
 auroc <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$AUROC)))
-    aupr <- auroc
-    prederror <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$prederror)))
-    times <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$times)))
+aupr <- auroc
+prederror <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$prederror)))
+times <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$times)))
 
-    for (b in 1:B) {
-      auroc[b, ] <- results[[b]]$onetwothree[[i]]$AUROC
-      aupr[b, ] <- results[[b]]$onetwothree[[i]]$AUPR
-      prederror[b, ] <- results[[b]]$onetwothree[[i]]$prederror
-      times[b, ] <- results[[b]]$onetwothree[[i]]$times
-    }
+for (b in 1:B) {
+  auroc[b, ] <- results[[b]]$onetwothree[[i]]$AUROC
+  aupr[b, ] <- results[[b]]$onetwothree[[i]]$AUPR
+  prederror[b, ] <- results[[b]]$onetwothree[[i]]$prederror
+  times[b, ] <- results[[b]]$onetwothree[[i]]$times
+}
 
-    data <- data.frame(melt(auroc), measure="auroc")
-    data <- rbind(data, data.frame(melt(aupr), measure="aupr"))
-    data <- rbind(data, data.frame(melt(prederror), measure="prederror"))
-    data <- rbind(data, data.frame(melt(times), measure="times"))
-    data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"))
+data <- data.frame(melt(auroc), measure="auroc")
+data <- rbind(data, data.frame(melt(aupr), measure="aupr"))
+data <- rbind(data, data.frame(melt(prederror), measure="prederror"))
+data <- rbind(data, data.frame(melt(times), measure="times"))
+data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"))
 
-    auroc_data <- subset(data, measure=="auroc")
-    P_auroc <- ggplot(auroc_data, aes(x=method, y=value)) +
-      geom_boxplot() +
-      theme_Ed() +
-      scale_colour_Ed() +
-      ylim(0,1) +
-      labs(y="AUROC") +
-      theme(axis.title.x=element_blank(),
-            axis.text.x=element_blank(),
-            axis.ticks.x=element_blank())
-    Pd_auroc <- ggplot_build(P_auroc)$data[[1]]
-    P_auroc <- P_auroc + geom_segment(data=Pd_auroc, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+auroc_data <- subset(data, measure=="auroc")
+P_auroc <- ggplot(auroc_data, aes(x=method, y=value)) +
+  geom_boxplot() +
+  theme_Ed() +
+  scale_colour_Ed() +
+  ylim(0,1) +
+  labs(y="AUROC") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+Pd_auroc <- ggplot_build(P_auroc)$data[[1]]
+P_auroc <- P_auroc + geom_segment(data=Pd_auroc, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
 
-    aupr_data <- subset(data, measure=="aupr")
-    P_aupr <- ggplot(aupr_data, aes(x=method, y=value)) +
-      geom_boxplot() +
-      theme_Ed() +
-      scale_colour_Ed() +
-      ylim(0,1) +
-      labs(y="AUPR") +
-      theme(axis.title.x=element_blank(),
-            axis.text.x=element_blank(),
-            axis.ticks.x=element_blank())
-    Pd_aupr <- ggplot_build(P_aupr)$data[[1]]
-    P_aupr <- P_aupr + geom_segment(data=Pd_aupr, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+aupr_data <- subset(data, measure=="aupr")
+P_aupr <- ggplot(aupr_data, aes(x=method, y=value)) +
+  geom_boxplot() +
+  theme_Ed() +
+  scale_colour_Ed() +
+  ylim(0,1) +
+  labs(y="AUPR") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+Pd_aupr <- ggplot_build(P_aupr)$data[[1]]
+P_aupr <- P_aupr + geom_segment(data=Pd_aupr, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
 
-    prederror_data <- subset(data, measure=="prederror")
-    P_prederror <- ggplot(prederror_data, aes(x=method, y=value)) +
-      geom_boxplot() +
-      theme_Ed() +
-      scale_colour_Ed() +
-      ylim(0,1) +
-      # scale_y_log10() +
-      labs(y="pred. error") +
-      theme(axis.title.x=element_blank(),
-            axis.text.x=element_blank(),
-            axis.ticks.x=element_blank())
-    Pd_prederror <- ggplot_build(P_prederror)$data[[1]]
-    P_prederror <- P_prederror + geom_segment(data=Pd_prederror, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+prederror_data <- subset(data, measure=="prederror")
+P_prederror <- ggplot(prederror_data, aes(x=method, y=value)) +
+  geom_boxplot() +
+  theme_Ed() +
+  scale_colour_Ed() +
+  ylim(0,1) +
+  # scale_y_log10() +
+  labs(y="pred. error") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+Pd_prederror <- ggplot_build(P_prederror)$data[[1]]
+P_prederror <- P_prederror + geom_segment(data=Pd_prederror, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
 
-    times_data <- subset(data, measure=="times")
-    P_times <- ggplot(times_data, aes(x=method, y=value)) +
-      geom_boxplot() +
-      theme_Ed() +
-      scale_colour_Ed() +
-      labs(y="time (log-scale)") +
-      theme(axis.title.x=element_blank(),
-            axis.text.x=element_blank(),
-            axis.ticks.x=element_blank())
-    Pd_times <- ggplot_build(P_times)$data[[1]]
-    P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
+times_data <- subset(data, measure=="times")
+P_times <- ggplot(times_data, aes(x=method, y=value)) +
+  geom_boxplot() +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(y="time (log-scale)") +
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+Pd_times <- ggplot_build(P_times)$data[[1]]
+P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
 
-    pdf(paste0('sim1_', i, '.pdf'), width=9, height=8.5,onefile = FALSE)
-    grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
-    dev.off()
-    embed_fonts(paste0('sim1_', i, '.pdf'), outfile=paste0('sim1_', i, '_embed.pdf'))
+grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
 ```
 
 ### medium
