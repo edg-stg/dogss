@@ -6,7 +6,7 @@ Edgar Steiger
 -   [Simulation](#simulation)
 -   [Comparison of methods - Needle plot](#comparison-of-methods---needle-plot)
 -   [Three scenarios for feature selection](#three-scenarios-for-feature-selection)
-    -   [small, medium and large signal recovery problems](#small-medium-and-large-signal-recovery-problems)
+    -   [small](#small)
     -   [medium](#medium)
     -   [large](#large)
 -   [Noise](#noise)
@@ -26,7 +26,9 @@ library(MBSGS) # Bayesian feature selection with Gibbs sampling
 
 library(ggplot2) # for nice plots
 library(ggthemes) # for even nicer plots
-library(grid) # to arrange plots pleasantly
+library(grid); library(gridExtra) # to arrange plots pleasantly
+
+library(reshape2) # to melt data into "tidy" long-format
 
 library(DescTools) # for area computations (AUROC, AUPR)
 ```
@@ -251,15 +253,13 @@ parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
 
 I provide the necessary data from my simulations to reconstruct the publication's plots. I will give the code that generated this data, but this code is marked to not be evaluated in this markdown file, instead only the side-loading of the RData-files is enabled. Feel free to re-run the generating code chunks on your local cluster!
 
-### small, medium and large signal recovery problems
-
 Here we will compare the different methods on three different problems. This code generated the necessary data for the plots (again, this code is set to *not* be evaluated within this markdown file):
 
 ``` r
 results_sr <- list()
 results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B)
-results_sr[[2]]
-results_sr[[3]]
+results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B)
+results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B)
 ```
 
 Instead, we load the data:
@@ -268,19 +268,20 @@ Instead, we load the data:
 load("results_sr_sml.RData")
 ```
 
-This is the code that generated Figures 3, 4 and 5:
+This is the code that generates Figures 3, 4 and 5:
 
 ``` r
-auroc <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$AUROC)))
+plot_sml <- function(sml) {
+  auroc <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$AUROC)))
 aupr <- auroc
-prederror <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$prederror)))
-times <- matrix(0, nrow=100, ncol=6, dimnames=list(run=1:100, method=names(results[[1]]$onetwothree[[i]]$times)))
+prederror <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$prederror)))
+times <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$times)))
 
 for (b in 1:B) {
-  auroc[b, ] <- results[[b]]$onetwothree[[i]]$AUROC
-  aupr[b, ] <- results[[b]]$onetwothree[[i]]$AUPR
-  prederror[b, ] <- results[[b]]$onetwothree[[i]]$prederror
-  times[b, ] <- results[[b]]$onetwothree[[i]]$times
+  auroc[b, ] <- results_sr[[sml]][[b]]$AUROC
+  aupr[b, ] <- results_sr[[sml]][[b]]$AUPR
+  prederror[b, ] <- results_sr[[sml]][[b]]$prederror
+  times[b, ] <- results_sr[[sml]][[b]]$times
 }
 
 data <- data.frame(melt(auroc), measure="auroc")
@@ -320,7 +321,7 @@ P_prederror <- ggplot(prederror_data, aes(x=method, y=value)) +
   geom_boxplot() +
   theme_Ed() +
   scale_colour_Ed() +
-  ylim(0,1) +
+  scale_y_continuous(breaks=c(0, 0.25, 0.5, 0.75, 1), limits=c(0, max(1, max(prederror)))) +
   # scale_y_log10() +
   labs(y="pred. error") +
   theme(axis.title.x=element_blank(),
@@ -342,20 +343,43 @@ Pd_times <- ggplot_build(P_times)$data[[1]]
 P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
 
 grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
+}
 ```
+
+### small
+
+Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). Figure 3:
+
+``` r
+plot_sml(1)
+```
+
+![](signal_recovery_files/figure-markdown_github/figure3-1.png)
 
 ### medium
 
-Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients).
+Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients). Figure 4:
+
+``` r
+plot_sml(2)
+```
+
+![](signal_recovery_files/figure-markdown_github/figure4-1.png)
 
 ### large
 
-Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients).
+Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients). Figure 5:
+
+``` r
+plot_sml(3)
+```
+
+![](signal_recovery_files/figure-markdown_github/figure5-1.png)
 
 Noise
 -----
 
-contents, F6
+Next we analyze how sensitive the methods are in regards to the noise level.
 
 Correlation structure
 ---------------------
