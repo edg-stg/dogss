@@ -260,76 +260,76 @@ This is the code that generates Figures 3, 4 and 5:
 ```{r figure345, eval=TRUE}
 plot_sml <- function(sml) {
   auroc <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$AUROC)))
-aupr <- auroc
-prederror <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$prederror)))
-times <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$times)))
-
-for (b in 1:B) {
-  auroc[b, ] <- results_sr[[sml]][[b]]$AUROC
-  aupr[b, ] <- results_sr[[sml]][[b]]$AUPR
-  prederror[b, ] <- results_sr[[sml]][[b]]$prederror
-  times[b, ] <- results_sr[[sml]][[b]]$times
-}
-
-data <- data.frame(melt(auroc), measure="auroc")
-data <- rbind(data, data.frame(melt(aupr), measure="aupr"))
-data <- rbind(data, data.frame(melt(prederror), measure="prederror"))
-data <- rbind(data, data.frame(melt(times), measure="times"))
-data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"))
-
-auroc_data <- subset(data, measure=="auroc")
-P_auroc <- ggplot(auroc_data, aes(x=method, y=value)) +
-  geom_boxplot() +
-  theme_Ed() +
-  scale_colour_Ed() +
-  ylim(0,1) +
-  labs(y="AUROC") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-Pd_auroc <- ggplot_build(P_auroc)$data[[1]]
-P_auroc <- P_auroc + geom_segment(data=Pd_auroc, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
-
-aupr_data <- subset(data, measure=="aupr")
-P_aupr <- ggplot(aupr_data, aes(x=method, y=value)) +
-  geom_boxplot() +
-  theme_Ed() +
-  scale_colour_Ed() +
-  ylim(0,1) +
-  labs(y="AUPR") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-Pd_aupr <- ggplot_build(P_aupr)$data[[1]]
-P_aupr <- P_aupr + geom_segment(data=Pd_aupr, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
-
-prederror_data <- subset(data, measure=="prederror")
-P_prederror <- ggplot(prederror_data, aes(x=method, y=value)) +
-  geom_boxplot() +
-  theme_Ed() +
-  scale_colour_Ed() +
-  scale_y_continuous(breaks=c(0, 0.25, 0.5, 0.75, 1), limits=c(0, max(1, max(prederror)))) +
-  # scale_y_log10() +
-  labs(y="pred. error") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-Pd_prederror <- ggplot_build(P_prederror)$data[[1]]
-P_prederror <- P_prederror + geom_segment(data=Pd_prederror, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
-
-times_data <- subset(data, measure=="times")
-P_times <- ggplot(times_data, aes(x=method, y=value)) +
-  geom_boxplot() +
-  theme_Ed() +
-  scale_colour_Ed() +
-  labs(y="time (log-scale)") +
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
-Pd_times <- ggplot_build(P_times)$data[[1]]
-P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
-
-grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
+  aupr <- auroc
+  prederror <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$prederror)))
+  times <- matrix(0, nrow=B, ncol=6, dimnames=list(run=1:B, method=names(results_sr[[sml]][[1]]$times)))
+  
+  for (b in 1:B) {
+    auroc[b, ] <- results_sr[[sml]][[b]]$AUROC
+    aupr[b, ] <- results_sr[[sml]][[b]]$AUPR
+    prederror[b, ] <- results_sr[[sml]][[b]]$prederror
+    times[b, ] <- results_sr[[sml]][[b]]$times
+  }
+  
+  data <- data.frame(melt(auroc), measure="auroc")
+  data <- rbind(data, data.frame(melt(aupr), measure="aupr"))
+  data <- rbind(data, data.frame(melt(prederror), measure="prederror"))
+  data <- rbind(data, data.frame(melt(times), measure="times"))
+  data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"))
+  
+  auroc_data <- subset(data, measure=="auroc")
+  P_auroc <- ggplot(auroc_data, aes(x=method, y=value)) +
+    geom_boxplot() +
+    theme_Ed() +
+    scale_colour_Ed() +
+    ylim(0,1) +
+    labs(y="AUROC") +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+  Pd_auroc <- ggplot_build(P_auroc)$data[[1]]
+  P_auroc <- P_auroc + geom_segment(data=Pd_auroc, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+  
+  aupr_data <- subset(data, measure=="aupr")
+  P_aupr <- ggplot(aupr_data, aes(x=method, y=value)) +
+    geom_boxplot() +
+    theme_Ed() +
+    scale_colour_Ed() +
+    ylim(0,1) +
+    labs(y="AUPR") +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+  Pd_aupr <- ggplot_build(P_aupr)$data[[1]]
+  P_aupr <- P_aupr + geom_segment(data=Pd_aupr, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+  
+  prederror_data <- subset(data, measure=="prederror")
+  P_prederror <- ggplot(prederror_data, aes(x=method, y=value)) +
+    geom_boxplot() +
+    theme_Ed() +
+    scale_colour_Ed() +
+    scale_y_continuous(breaks=c(0, 0.25, 0.5, 0.75, 1), limits=c(0, max(1, max(prederror)))) +
+    # scale_y_log10() +
+    labs(y="pred. error") +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+  Pd_prederror <- ggplot_build(P_prederror)$data[[1]]
+  P_prederror <- P_prederror + geom_segment(data=Pd_prederror, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method")
+  
+  times_data <- subset(data, measure=="times")
+  P_times <- ggplot(times_data, aes(x=method, y=value)) +
+    geom_boxplot() +
+    theme_Ed() +
+    scale_colour_Ed() +
+    labs(y="time (log-scale)") +
+    theme(axis.title.x=element_blank(),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank())
+  Pd_times <- ggplot_build(P_times)$data[[1]]
+  P_times <- P_times + geom_segment(data=Pd_times, aes(x=xmin, xend=xmax, y=middle, yend=middle, colour=unique(data$method)), size=1) + labs(colour="method") + scale_y_log10() 
+  
+  grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
 }
 
 ```
@@ -338,7 +338,7 @@ grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow
 
 Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). Figure 3:
 
-```{r figure3, fig.height=8.5, fig.width=9,}
+```{r figure3, fig.height=8.5, fig.width=9}
 plot_sml(1)
 ```
 
@@ -346,7 +346,7 @@ plot_sml(1)
 
 Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients). Figure 4:
 
-```{r figure4, fig.height=8.5, fig.width=9,}
+```{r figure4, fig.height=8.5, fig.width=9}
 plot_sml(2)
 ```
 
@@ -354,7 +354,7 @@ plot_sml(2)
 
 Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients). Figure 5:
 
-```{r figure5, fig.height=8.5, fig.width=9,}
+```{r figure5, fig.height=8.5, fig.width=9}
 plot_sml(3)
 ```
 
@@ -374,12 +374,161 @@ results_noise[[5]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sig
 ```
 
 
-```{r load_sim_noise}
+```{r load_sim_noise, eval=TRUE}
 load("results_sr_noise.RData")
 ```
 
+```{r figure6, fig.height=9.5, fig.width=9}
+auroc_noise <- matrix(0, nrow=5, ncol=6, dimnames=list(noise=c(0, 0.1, 1, 3, 5), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+aupr_noise <- matrix(0, nrow=5, ncol=6, dimnames=list(noise=c(0, 0.1, 1, 3, 5), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+prederror_noise <- matrix(0, nrow=5, ncol=6, dimnames=list(noise=c(0, 0.1, 1, 3, 5), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+times_noise <- matrix(0, nrow=5, ncol=6, dimnames=list(noise=c(0, 0.1, 1, 3, 5), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
+for (i in 1:5) {
+  auroc <- matrix(0, nrow=100, ncol=6)
+  colnames(auroc) <- names(results_noise[[i]][[1]]$AUROC)
+  aupr <- auroc
+  prederror <- matrix(0, nrow=100, ncol=6)
+  colnames(prederror) <- names(results_noise[[i]][[1]]$prederror)
+  times <- matrix(0, nrow=100, ncol=6)
+  colnames(times) <- names(results_noise[[i]][[1]]$times)
+  
+  for (b in 1:B) {
+    auroc[b, ] <- results_noise[[i]][[b]]$AUROC
+    aupr[b, ] <- results_noise[[i]][[b]]$AUPR
+    prederror[b, ] <- results_noise[[i]][[b]]$prederror
+    times[b, ] <- results_noise[[i]][[b]]$times
+  }
+  auroc_noise[i, ] <- apply(auroc, 2, median)
+  aupr_noise[i, ] <- apply(aupr, 2, median)
+  prederror_noise[i, ] <- apply(prederror, 2, median)
+  times_noise[i, ] <- apply(times, 2, median)
+}
+
+data <- rbind(data.frame(melt(auroc_noise), measure=rep("auroc", length(auroc_noise))), data.frame(melt(aupr_noise), measure=rep("aupr", length(aupr_noise))), data.frame(melt(prederror_noise), measure=rep("prederror", length(prederror_noise))), data.frame(melt(times_noise), measure=rep("times", length(times_noise))))
+data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"))
+
+auroc_data <- subset(data, measure=="auroc")
+P_auroc <- ggplot(auroc_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
+  geom_line(size=1, position = position_dodge(0.01)) +
+  ylim(0, 1) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="noise", y="AUROC", colour="Method")
+
+aupr_data <- subset(data, measure=="aupr")
+P_aupr <- ggplot(aupr_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
+  geom_line(size=1, position = position_dodge(0.01)) +
+  ylim(0, 1) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="noise", y="AUPR", colour="Method")
+
+prederror_data <- subset(data, measure=="prederror")
+P_prederror <- ggplot(prederror_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
+  geom_line(size=1, position = position_dodge(0.01)) +
+  ylim(0, max(prederror_noise)) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="noise", y="pred. error", colour="Method")
+
+times_data <- subset(data, measure=="times")
+P_times <- ggplot(times_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
+  geom_line(size=1, position = position_dodge(0.01)) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  scale_y_log10() +
+  labs(x="noise", y="times (log-scale)", colour="Method")
+
+grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
+```
 
 ## Correlation structure
+
+Next we analyze how sensitive the methods are in regards to the correlation structure of the variables. The first correlation structure is the one that we already employed above, where all features are independent of each other. The second correlation structure is such that all features have a pairwise correlation fixed at 0.5. Finally, the third correlation structure is based on the group membership of features, meaning that features within the same group have a pairwise correlation of 0.5, while features from pairwise different groups have no correlation.
+
+First we define two new functions which simulate new data (one for pairwise and one for groupwise correlation):
+
+```{r pw_gw_sim}
+sim_sr_pw <- function(m, p, nG, nzG, k, sigma0) {
+  beta <- rep(0, p)
+  G <- sort(sample(1:nG, p, replace=TRUE))
+  while (sum(!(1:nG %in% G)) > 0) { # this makes sure we have exactly nG groups
+    G <- sort(sample(1:nG, p, replace=TRUE))
+  }
+  
+  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
+  whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
+  beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
+  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
+  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  return(sim)
+}
+
+sim_sr_gw <- function(m, p, nG, nzG, k, sigma0) {
+  beta <- rep(0, p)
+  G <- sort(sample(1:nG, p, replace=TRUE))
+  while (sum(!(1:nG %in% G)) > 0) { # this makes sure we have exactly nG groups
+    G <- sort(sample(1:nG, p, replace=TRUE))
+  }
+  
+  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
+  whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
+  beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
+  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
+  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  return(sim)
+}
+```
+
+
+
+```{r figure7, fig.height=9.5, fig.width=9}
+  auroc <- data.frame(value=numeric(), method=character(), corrstruct=character())
+  aupr <- data.frame(value=numeric(), method=character(), corrstruct=character())
+  prederror <- data.frame(value=numeric(), method=character(), corrstruct=character())
+  times <- data.frame(value=numeric(), method=character(), corrstruct=character())
+
+  method <- c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")
+
+  for (b in 1:B) {
+    for (m in 1:6) {
+      auroc <- rbind(auroc, data.frame(value=results[[b]]$onetwothree[[2]]$AUROC[m], method=method[m], corrstruct="nocorr"))
+      aupr <- rbind(aupr, data.frame(value=results[[b]]$onetwothree[[2]]$AUPR[m], method=method[m], corrstruct="nocorr"))
+      prederror <- rbind(prederror, data.frame(value=results[[b]]$onetwothree[[2]]$prederror[m], method=method[m], corrstruct="nocorr"))
+      times <- rbind(times, data.frame(value=results[[b]]$onetwothree[[2]]$times[m], method=names(results[[b]]$onetwothree[[2]]$times[m]), corrstruct="nocorr"))
+    }
+  }
+  for (b in 1:B) {
+    for (m in 1:6) {
+      auroc <- rbind(auroc, data.frame(value=results[[b]]$corr_struct[[1]]$AUROC[m], method=method[m], corrstruct="pw"))
+      aupr <- rbind(aupr, data.frame(value=results[[b]]$corr_struct[[1]]$AUPR[m], method=method[m], corrstruct="pw"))
+      prederror <- rbind(prederror, data.frame(value=results[[b]]$corr_struct[[1]]$prederror[m], method=method[m], corrstruct="pw"))
+      times <- rbind(times, data.frame(value=results[[b]]$corr_struct[[1]]$times[m], method=names(results[[b]]$corr_struct[[1]]$times[m]), corrstruct="pw"))
+    }
+  }
+  for (b in 1:B) {
+    for (m in 1:6) {
+      auroc <- rbind(auroc, data.frame(value=results[[b]]$corr_struct[[2]]$AUROC[m], method=method[m], corrstruct="gw"))
+      aupr <- rbind(aupr, data.frame(value=results[[b]]$corr_struct[[2]]$AUPR[m], method=method[m], corrstruct="gw"))
+      prederror <- rbind(prederror, data.frame(value=results[[b]]$corr_struct[[2]]$prederror[m], method=method[m], corrstruct="gw"))
+      times <- rbind(times, data.frame(value=results[[b]]$corr_struct[[2]]$times[m], method=names(results[[b]]$corr_struct[[2]]$times[m]), corrstruct="gw"))
+    }
+  }
+  
+  times$method <- factor(times$method, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"), ordered=TRUE)
+  
+  Ed_palette <- Ed_palette[7:9]
+
+  plot_auroc <- ggplot(aes(y = value, x = method, fill = corrstruct), data = auroc) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + scale_fill_Ed() + theme(axis.title.x=element_blank()) + ylab("AUROC")
+  plot_aupr <- ggplot(aes(y = value, x = method, fill = corrstruct), data = aupr) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + scale_fill_Ed() + theme(axis.title.x=element_blank()) + ylab("AUPR")
+  plot_prederror <- ggplot(aes(y = value, x = method, fill = corrstruct), data = prederror) + geom_boxplot(alpha=0.6) + theme_Ed() + scale_fill_Ed() + theme(axis.title.x=element_blank()) + ylab("pred. error") + ylim(0, 1.5) # + scale_y_log10()
+  plot_times <- ggplot(aes(y = value, x = method, fill = corrstruct), data = times) + geom_boxplot(alpha=0.6) + theme_Ed() + theme(axis.title.x=element_blank()) + ylab("time (log-scale)") + labs(fill="corr. struct.") + scale_y_log10() +  scale_fill_manual(values=Ed_palette[1:3], name="corr. struct.", breaks=c("nocorr", "pw", "gw"), labels=c("no corr.", "pairwise", "groupwise")) 
+
+  grid_arrange_shared_legend(plot_auroc, plot_aupr, plot_prederror, plot_times, ncol = 2, nrow = 2, which.legend = 4)
+```
+
 
 contents, F7
 
