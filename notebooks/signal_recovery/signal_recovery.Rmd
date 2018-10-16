@@ -339,14 +339,8 @@ plot_sml <- function(sml) {
 
 Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). Figure 3:
 
-```{r prefigure3, dev="pdf", dev.args=list(onefile=FALSE)}
-# this r-chunk is needed to avoid blank plots, bug: https://support.rstudio.com/hc/en-us/community/posts/239529128-Notebooks-grid-newpage
-plot_sml(1)
-```
-
 ```{r figure3, fig.height=8.5, fig.width=9}
-grid.newpage()
-grid.draw(plot_s)
+plot_sml(1)
 ```
 
 
@@ -354,28 +348,16 @@ grid.draw(plot_s)
 
 Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients). Figure 4:
 
-```{r prefigure4}
-# this r-chunk is needed to avoid blank plots, bug: https://support.rstudio.com/hc/en-us/community/posts/239529128-Notebooks-grid-newpage
-plot_m <- plot_sml(2)
-```
-
 ```{r figure4, fig.height=8.5, fig.width=9}
-grid.newpage()
-grid.draw(plot_m)
+plot_sml(2)
 ```
 
 ### large
 
 Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients). Figure 5:
 
-```{r prefigure5}
-# this r-chunk is needed to avoid blank plots, bug: https://support.rstudio.com/hc/en-us/community/posts/239529128-Notebooks-grid-newpage
-plot_l <- plot_sml(3)
-```
-
 ```{r figure5 fig.height=8.5, fig.width=9}
-grid.newpage()
-grid.draw(plot_l)
+plot_sml(3)
 ```
 
 ## Noise
