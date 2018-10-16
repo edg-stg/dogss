@@ -71,6 +71,7 @@ sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
 It might happen that we have less than **k** non-zero coefficients if the **nzG** non-zero groups have together less than **k** elements. Here is an example simulation with this function and the parameters defined above:
 
 ```{r examplesim, fig.width=4, fig.height=2.5}
+set.seed(7042)
 sim <- sim_signalrecovery(m, p, nG, nzG, k, sigma0)
 
 X <- sim$X; Y <- sim$Y; beta <- sim$beta; G <- sim$G
@@ -484,7 +485,7 @@ sim_sr_gw <- function(m, p, nG, nzG, k, sigma0) {
 
 
 
-```{r figure7, fig.height=9.5, fig.width=9}
+```{r figure7, fig.height=9.5, fig.width=9, eval=FALSE}
   auroc <- data.frame(value=numeric(), method=character(), corrstruct=character())
   aupr <- data.frame(value=numeric(), method=character(), corrstruct=character())
   prederror <- data.frame(value=numeric(), method=character(), corrstruct=character())
