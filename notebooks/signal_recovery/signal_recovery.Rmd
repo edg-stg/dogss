@@ -58,12 +58,12 @@ sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
     G <- sort(sample(1:nG, p, replace=TRUE))
   }
   
-  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  X <- matrix(rnorm((m+100)*p, 0, 1), nrow=m+100, ncol=p)
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
-  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
-  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  Y <- as.vector(X %*% beta) + rnorm(m+100, 0, sigma0) # final linear model
+  sim <- list(Y=Y[1:m], X=X[1:m, ], beta=beta, G=G, Y.test=Y[(m+1):(m+100)], X.test=X[(m+1):(m+100), ])
   return(sim)
 }
 ```
@@ -173,8 +173,8 @@ parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
     sizegroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
     
     # test data for the prediction
-    X.test <- matrix(rnorm(100*p), nrow=100, ncol=p)
-    Y.test <- as.vector(X.test %*% beta) + rnorm(100, 0, sigma0)
+    X.test <- sim$X.test
+    Y.test <- sim$Y.test
     
     # calculate lambda path to make the lasso approaches comparable (based on standard lasso):
     lambda_max <- max(abs(colSums(X*Y)))/m
@@ -339,24 +339,43 @@ plot_sml <- function(sml) {
 
 Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). Figure 3:
 
-```{r figure3, fig.height=8.5, fig.width=9}
+```{r prefigure3, dev="pdf", dev.args=list(onefile=FALSE)}
+# this r-chunk is needed to avoid blank plots, bug: https://support.rstudio.com/hc/en-us/community/posts/239529128-Notebooks-grid-newpage
 plot_sml(1)
 ```
+
+```{r figure3, fig.height=8.5, fig.width=9}
+grid.newpage()
+grid.draw(plot_s)
+```
+
 
 ### medium
 
 Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients). Figure 4:
 
+```{r prefigure4}
+# this r-chunk is needed to avoid blank plots, bug: https://support.rstudio.com/hc/en-us/community/posts/239529128-Notebooks-grid-newpage
+plot_m <- plot_sml(2)
+```
+
 ```{r figure4, fig.height=8.5, fig.width=9}
-plot_sml(2)
+grid.newpage()
+grid.draw(plot_m)
 ```
 
 ### large
 
 Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients). Figure 5:
 
-```{r figure5, fig.height=8.5, fig.width=9}
-plot_sml(3)
+```{r prefigure5}
+# this r-chunk is needed to avoid blank plots, bug: https://support.rstudio.com/hc/en-us/community/posts/239529128-Notebooks-grid-newpage
+plot_l <- plot_sml(3)
+```
+
+```{r figure5 fig.height=8.5, fig.width=9}
+grid.newpage()
+grid.draw(plot_l)
 ```
 
 ## Noise
