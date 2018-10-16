@@ -458,12 +458,15 @@ sim_sr_pw <- function(m, p, nG, nzG, k, sigma0) {
     G <- sort(sample(1:nG, p, replace=TRUE))
   }
   
-  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  x <- rnorm(m+100, 0, 1)
+  X <- sapply(1:p, function(i) x+rnorm(m+100, 0, 1)) # this gives a matrix where variables/columns have pairwise correlation 0.5 on the population level
+  X <- scale(X) # otherwise variance of columns wouldn't be 1
+
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
-  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
-  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  Y <- as.vector(X %*% beta) + rnorm(m+100, 0, sigma0) # final linear model
+  sim <- list(Y=Y[1:m], X=X[1:m, ], beta=beta, G=G, Y.test=Y[(m+1):(m+100)], X.test=X[(m+1):(m+100), ])
   return(sim)
 }
 
@@ -474,12 +477,18 @@ sim_sr_gw <- function(m, p, nG, nzG, k, sigma0) {
     G <- sort(sample(1:nG, p, replace=TRUE))
   }
   
-  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  x <- matrix(rnorm((m+100)*ngroups), nrow=m+100, ncol=ngroups)
+  x2 <- matrix(rnorm((m+100)*p), nrow=m+100, ncol=p)
+  for (j in 1:p) { # this gives us a matrix with groupwise correlation of 0.5 on the population level, features of different groups are independent
+    x2[, j] <- x2[, j] + x[, G[j]]
+  }
+  X <- scale(x2)
+
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
-  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
-  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  Y <- as.vector(X %*% beta) + rnorm(m+100, 0, sigma0) # final linear model
+  sim <- list(Y=Y[1:m], X=X[1:m, ], beta=beta, G=G, Y.test=Y[(m+1):(m+100)], X.test=X[(m+1):(m+100), ])
   return(sim)
 }
 ```
