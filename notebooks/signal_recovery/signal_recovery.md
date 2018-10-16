@@ -65,12 +65,12 @@ sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
     G <- sort(sample(1:nG, p, replace=TRUE))
   }
   
-  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  X <- matrix(rnorm((m+100)*p, 0, 1), nrow=m+100, ncol=p)
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
-  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
-  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  Y <- as.vector(X %*% beta) + rnorm(m+100, 0, sigma0) # final linear model
+  sim <- list(Y=Y[1:m], X=X[1:m, ], beta=beta, G=G, Y.test=Y[(m+1):(m+100)], X.test=X[(m+1):(m+100), ])
   return(sim)
 }
 ```
@@ -186,8 +186,8 @@ parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
     sizegroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
     
     # test data for the prediction
-    X.test <- matrix(rnorm(100*p), nrow=100, ncol=p)
-    Y.test <- as.vector(X.test %*% beta) + rnorm(100, 0, sigma0)
+    X.test <- sim$X.test
+    Y.test <- sim$Y.test
     
     # calculate lambda path to make the lasso approaches comparable (based on standard lasso):
     lambda_max <- max(abs(colSums(X*Y)))/m

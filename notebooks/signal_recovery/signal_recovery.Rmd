@@ -356,7 +356,7 @@ plot_sml(2)
 
 Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients). Figure 5:
 
-```{r figure5 fig.height=8.5, fig.width=9}
+```{r figure5, fig.height=8.5, fig.width=9}
 plot_sml(3)
 ```
 
