@@ -158,7 +158,7 @@ Furthermore I specified the number of simulations (**B**) and the number of core
 To generate the data of many simulations with parallelization we will use the following function:
 
 ```{r parallelfunction}
-parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
+parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B, simfunction) {
   
   ncl <- detectCores()
   ncl <- min(ncl, ncores)
@@ -167,7 +167,7 @@ parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
   registerDoParallel(myCluster)
   
   results <- foreach (b=1:B, .packages=c("dogss", "gglasso", "SGL", "glmnet", "MBSGS", "DescTools")) %dopar% {
-    sim <- sim_signalrecovery(m, p, nG, nzG, k, sigma0)
+    sim <- simfunction(m, p, nG, nzG, k, sigma0)
     
     X <- sim$X; Y <- sim$Y; beta <- sim$beta; G <- sim$G
     sizegroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
@@ -245,9 +245,9 @@ Here we will compare the different methods on three different problems. This cod
 
 ```{r sims, eval=FALSE}
 results_sr <- list()
-results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B)
-results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B)
-results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B)
+results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 ```
 
 Instead, we load the data:
@@ -368,11 +368,11 @@ Next we analyze how sensitive the methods are in regards to the noise level.
 m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
 
 results_noise <- list()
-results_noise[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B)
-results_noise[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B)
-results_noise[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B)
-results_noise[[4]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=3, ncores=ncores, B=B)
-results_noise[[5]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=5, ncores=ncores, B=B)
+results_noise[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[4]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=3, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[5]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=5, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 ```
 
 
@@ -493,6 +493,22 @@ sim_sr_gw <- function(m, p, nG, nzG, k, sigma0) {
 }
 ```
 
+With these functions, we can simulate data to compare the performance of methods in the presence of different correlation structures:
+
+```{r sim_corr, eval=FALSE}
+m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
+
+results_corrstruct <- list()
+results_corrstruct[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B, simfunction=sim_signalrecovery) # we did this before, no correlation
+results_corrstruct[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B, simfunction=sim_sr_pw) # global pairwise correlation
+results_corrstruct[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B, simfunction=sim_sr_gw) # groupwise pairwise correlation
+```
+
+Or, just laod the provided RData:
+
+```{r load_sim_corrstruct, eval=TRUE}
+load("results_sr_corrstruct.RData")
+```
 
 
 ```{r figure7, fig.height=9.5, fig.width=9, eval=FALSE}
