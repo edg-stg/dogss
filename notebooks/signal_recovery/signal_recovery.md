@@ -3,7 +3,7 @@ Signal recovery with dogss
 Edgar Steiger
 2018
 
--   [Simulation](#simulation)
+-   [Simulations](#simulations)
 -   [Comparison of methods - Needle plot](#comparison-of-methods---needle-plot)
 -   [Three scenarios for feature selection](#three-scenarios-for-feature-selection)
     -   [small](#small)
@@ -42,8 +42,16 @@ source("../auxiliary_rfunctions/my_cvSGL.R") # proper cross validation for SGL p
 source("../auxiliary_rfunctions/my_theme.R") # functions to adjust ggplots
 ```
 
-Simulation
-----------
+Finally, we provide all of the results on our simulated data to reconstruct the plots from the publication. If you wish to re-do all of the simulations/calculations, change the following parameter to **TRUE** (only do this if you have access to multiple cores):
+
+``` r
+selfcompute <- FALSE
+B <- 100 # number of simulations
+ncores <- 50 # number of cores used for parallelization
+```
+
+Simulations
+-----------
 
 We show how to simulate data for signal recovery. This data will be used in the next section.
 
@@ -105,14 +113,19 @@ Comparison of methods - Needle plot
 Next we will run six different methods on our simulated data **X**, **Y**, **G** to reconstruct the coefficient vector. Please note that **BSGSSS** because of Gibbs sampling needs a few minutes to run on a standard machine:
 
 ``` r
-results <- list()
+if (selfcompute) {
+  results <- list()
   
-results$dogss <- cv_dogss(X,Y,G)
-results$ssep <- cv_dogss(X,Y,G=NULL) 
-results$lasso <- cv.glmnet(x=X, y=Y, intercept=FALSE, standardize=FALSE)
-results$sgl <- my_cvSGL(data=list(x=X,y=Y),index=G, standardize=FALSE)
-results$gglasso <- cv.gglasso(x=X, y=Y, group=G, nfolds=10, intercept=FALSE)
-results$bsgsss <- my_BSGSSS(Y=Y, X=X, group_size=sizegroups)
+  results$dogss <- cv_dogss(X,Y,G)
+  results$ssep <- cv_dogss(X,Y,G=NULL) 
+  results$lasso <- cv.glmnet(x=X, y=Y, intercept=FALSE, standardize=FALSE)
+  results$sgl <- my_cvSGL(data=list(x=X,y=Y),index=G, standardize=FALSE)
+  results$gglasso <- cv.gglasso(x=X, y=Y, group=G, nfolds=10, intercept=FALSE)
+  results$bsgsss <- my_BSGSSS(Y=Y, X=X, group_size=sizegroups)
+  save(results, file="results_sr_example.RData")
+} else {
+  load("results_sr_example.RData")
+}
 ```
 
 Finally we will plot all of the reconstructed coefficient vectors together with the original one, this is Figure 2 from the paper:
@@ -161,9 +174,6 @@ Please note that these codes will run for long times (mostly because of the Gibb
 ``` r
 library(foreach)
 library(doParallel)
-
-B <- 100 # number of simulations
-ncores <- 50 # number of cores used for parallelization
 ```
 
 Furthermore I specified the number of simulations (**B**) and the number of cores (**ncores**) for the parallelization.
@@ -257,16 +267,14 @@ I provide the necessary data from my simulations to reconstruct the publication'
 Here we will compare the different methods on three different problems. This code generated the necessary data for the plots (again, this code is set to *not* be evaluated within this markdown file):
 
 ``` r
-results_sr <- list()
-results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
-results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
-results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
-```
-
-Instead, we load the data:
-
-``` r
-load("results_sr_sml.RData")
+if (selfcompute) {
+  results_sr <- list()
+  results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+  results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+  results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+} else {
+  load("results_sr_sml.RData")
+}
 ```
 
 This is the code that generates Figures 3, 4 and 5:
@@ -385,17 +393,20 @@ Next we analyze how sensitive the methods are in regards to the noise level.
 ``` r
 m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
 
-results_noise <- list()
+if (selfcompute) {
+  results_noise <- list()
 results_noise[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 results_noise[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 results_noise[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 results_noise[[4]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=3, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 results_noise[[5]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=5, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+save(results_noise, file="results_sr_noise.RData")
+} else {
+  load("results_sr_noise.RData")
+}
 ```
 
-``` r
-load("results_sr_noise.RData")
-```
+And this will give Figure 6 from the publication:
 
 ``` r
 auroc_noise <- matrix(0, nrow=5, ncol=6, dimnames=list(noise=c(0, 0.1, 1, 3, 5), method=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")))
@@ -481,7 +492,7 @@ sim_sr_pw <- function(m, p, nG, nzG, k, sigma0) {
   x <- rnorm(m+100, 0, 1)
   X <- sapply(1:p, function(i) x+rnorm(m+100, 0, 1)) # this gives a matrix where variables/columns have pairwise correlation 0.5 on the population level
   X <- scale(X) # otherwise variance of columns wouldn't be 1
-
+  
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
@@ -503,7 +514,7 @@ sim_sr_gw <- function(m, p, nG, nzG, k, sigma0) {
     x2[, j] <- x2[, j] + x[, G[j]]
   }
   X <- scale(x2)
-
+  
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
@@ -518,19 +529,18 @@ With these functions, we can simulate data to compare the performance of methods
 ``` r
 m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
 
-results_corrstruct <- list()
+if (selfcompute) {
+  results_corrstruct <- list()
 results_corrstruct[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B, simfunction=sim_signalrecovery) # we did this before, no correlation
 results_corrstruct[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B, simfunction=sim_sr_pw) # global pairwise correlation
 results_corrstruct[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B, simfunction=sim_sr_gw) # groupwise pairwise correlation
+save(results_corrstruct, file="results_sr_corrstruct.RData")
+} else {
+  load("results_sr_corrstruct.RData")
+}
 ```
 
-Or, just load the provided RData:
-
-``` r
-load("results_sr_corrstruct.RData")
-```
-
-Next we will plot the results, with a side-by-side boxplot:
+Next we will plot the results, with a side-by-side boxplot (Figure 7 from the publication):
 
 ``` r
 auroc <- data.frame(value=numeric(), method=character(), corrstruct=character())
@@ -542,13 +552,13 @@ method <- c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")
 corrstruct <- c("nocorr", "pw", "gw")
 for (cs in 1:3) {
   for (b in 1:B) {
-  for (mt in 1:6) {
-    auroc <- rbind(auroc, data.frame(value=results_corrstruct[[cs]][[b]]$AUROC[mt], method=method[mt], corrstruct=corrstruct[cs]))
-    aupr <- rbind(aupr, data.frame(value=results_corrstruct[[cs]][[b]]$AUPR[mt], method=method[mt], corrstruct=corrstruct[cs]))
-    prederror <- rbind(prederror, data.frame(value=results_corrstruct[[cs]][[b]]$prederror[mt], method=method[mt], corrstruct=corrstruct[cs]))
-    times <- rbind(times, data.frame(value=results_corrstruct[[cs]][[b]]$times[mt], method=method[mt], corrstruct=corrstruct[cs]))
+    for (mt in 1:6) {
+      auroc <- rbind(auroc, data.frame(value=results_corrstruct[[cs]][[b]]$AUROC[mt], method=method[mt], corrstruct=corrstruct[cs]))
+      aupr <- rbind(aupr, data.frame(value=results_corrstruct[[cs]][[b]]$AUPR[mt], method=method[mt], corrstruct=corrstruct[cs]))
+      prederror <- rbind(prederror, data.frame(value=results_corrstruct[[cs]][[b]]$prederror[mt], method=method[mt], corrstruct=corrstruct[cs]))
+      times <- rbind(times, data.frame(value=results_corrstruct[[cs]][[b]]$times[mt], method=method[mt], corrstruct=corrstruct[cs]))
+    }
   }
-}
 }
 
 plot_auroc <- ggplot(aes(y = value, x = method, fill = corrstruct), data = auroc) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + theme(axis.title.x=element_blank()) + ylab("AUROC") + scale_fill_manual(values=Ed_palette[7:9])
@@ -569,13 +579,8 @@ Here we will shortly analyze how the proposed "dogss" method and the simple spik
 ``` r
 Sigma_slab <- c(0.5, 1, 2, 5, 10, 100)
 m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
-```
 
-We simulate and evaluate on multiple cores again:
-
-``` r
-ncores <- 50; B <- 100
-
+if (selfcompute) {
 ncl <- detectCores()
 ncl <- min(ncl, ncores)
 
@@ -633,12 +638,10 @@ results_slab <- foreach (b=1:B, .packages=c("dogss", "DescTools")) %dopar% {
   six_slabs
 }
 stopCluster(myCluster)
-```
-
-Or load the data:
-
-``` r
-load("results_sr_slab.RData")
+save(results_slab, file="results_sr_slab.RData")
+} else {
+  load("results_sr_slab.RData")
+}
 ```
 
 We will asses the performance with line plots, which is Figure 8 in the publication:
