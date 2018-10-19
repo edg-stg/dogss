@@ -92,7 +92,7 @@ ggplot(example_signal, aes(colour=G, x=index, ymax=beta, ymin=0)) +
   scale_colour_manual(values=rep(Ed_palette,length.out=p)) +
   scale_x_continuous(breaks = c(0.5, cumsum(sizegroups[1:(nG)])+0.5), expand=c(0,1)) +
   labs(colour = "group", x="index of coefficient", y="value of coefficient") +
-  theme_Ed() + theme(plot.title = element_blank(), legend.position = "top", axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.line.x =element_blank())
+  theme_Ed() + theme(plot.title = element_blank(), legend.position = "top", axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.line.x =element_blank(), aspect.ratio=0.3)
 ```
 
 ![](signal_recovery_files/figure-markdown_github/examplesim-1.png)
@@ -140,7 +140,7 @@ ggplot(mydata_signal, aes(colour=G, x=index, ymax=BETAS, ymin=0)) +
   scale_colour_manual(values=rep(Ed_palette,length.out=p)) +
   scale_x_continuous(breaks = c(0.5, cumsum(sizegroups[1:(nG)])+0.5), expand=c(0,1)) +
   labs(colour = "group", x="index of coefficient", y="value of coefficient") +
-  theme_Ed() + theme(plot.title = element_blank(), legend.position = "top", axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.line.x =element_blank())
+  theme_Ed() + theme(plot.title = element_blank(), legend.position = "top", axis.text.x = element_blank(), axis.ticks.x = element_blank(), axis.line.x =element_blank(), aspect.ratio=0.3)
 ```
 
 ![](signal_recovery_files/figure-markdown_github/figure2-1.png)
@@ -171,7 +171,7 @@ Furthermore I specified the number of simulations (**B**) and the number of core
 To generate the data of many simulations with parallelization we will use the following function:
 
 ``` r
-parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
+parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B, simfunction) {
   
   ncl <- detectCores()
   ncl <- min(ncl, ncores)
@@ -180,7 +180,7 @@ parallel_signalrecovery <- function(m, p, nG, nzG, k, sigma0, ncores, B) {
   registerDoParallel(myCluster)
   
   results <- foreach (b=1:B, .packages=c("dogss", "gglasso", "SGL", "glmnet", "MBSGS", "DescTools")) %dopar% {
-    sim <- sim_signalrecovery(m, p, nG, nzG, k, sigma0)
+    sim <- simfunction(m, p, nG, nzG, k, sigma0)
     
     X <- sim$X; Y <- sim$Y; beta <- sim$beta; G <- sim$G
     sizegroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
@@ -258,9 +258,9 @@ Here we will compare the different methods on three different problems. This cod
 
 ``` r
 results_sr <- list()
-results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B)
-results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B)
-results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B)
+results_sr[[1]] <- parallel_signalrecovery(m=30, p=30, nG=5, nzG=nzG, k=5, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_sr[[2]] <- parallel_signalrecovery(m=30, p=100, nG=20, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_sr[[3]] <- parallel_signalrecovery(m=100, p=1000, nG=100, nzG=nzG, k=10, sigma0=sigma0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 ```
 
 Instead, we load the data:
@@ -386,11 +386,11 @@ Next we analyze how sensitive the methods are in regards to the noise level.
 m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
 
 results_noise <- list()
-results_noise[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B)
-results_noise[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B)
-results_noise[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B)
-results_noise[[4]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=3, ncores=ncores, B=B)
-results_noise[[5]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=5, ncores=ncores, B=B)
+results_noise[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[4]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=3, ncores=ncores, B=B, simfunction=sim_signalrecovery)
+results_noise[[5]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=5, ncores=ncores, B=B, simfunction=sim_signalrecovery)
 ```
 
 ``` r
@@ -432,7 +432,7 @@ P_auroc <- ggplot(auroc_data, aes(x=as.factor(noise), y=value, group=method, col
   ylim(0, 1) +
   theme_Ed() +
   scale_colour_Ed() +
-  labs(x="noise", y="AUROC", colour="Method")
+  labs(x="noise", y="AUROC", colour="method")
 
 aupr_data <- subset(data, measure=="aupr")
 P_aupr <- ggplot(aupr_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
@@ -440,7 +440,7 @@ P_aupr <- ggplot(aupr_data, aes(x=as.factor(noise), y=value, group=method, colou
   ylim(0, 1) +
   theme_Ed() +
   scale_colour_Ed() +
-  labs(x="noise", y="AUPR", colour="Method")
+  labs(x="noise", y="AUPR", colour="method")
 
 prederror_data <- subset(data, measure=="prederror")
 P_prederror <- ggplot(prederror_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
@@ -448,7 +448,7 @@ P_prederror <- ggplot(prederror_data, aes(x=as.factor(noise), y=value, group=met
   ylim(0, max(prederror_noise)) +
   theme_Ed() +
   scale_colour_Ed() +
-  labs(x="noise", y="pred. error", colour="Method")
+  labs(x="noise", y="pred. error", colour="method")
 
 times_data <- subset(data, measure=="times")
 P_times <- ggplot(times_data, aes(x=as.factor(noise), y=value, group=method, colour=method)) +
@@ -456,7 +456,7 @@ P_times <- ggplot(times_data, aes(x=as.factor(noise), y=value, group=method, col
   theme_Ed() +
   scale_colour_Ed() +
   scale_y_log10() +
-  labs(x="noise", y="times (log-scale)", colour="Method")
+  labs(x="noise", y="times (log-scale)", colour="method")
 
 grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
 ```
@@ -478,12 +478,15 @@ sim_sr_pw <- function(m, p, nG, nzG, k, sigma0) {
     G <- sort(sample(1:nG, p, replace=TRUE))
   }
   
-  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  x <- rnorm(m+100, 0, 1)
+  X <- sapply(1:p, function(i) x+rnorm(m+100, 0, 1)) # this gives a matrix where variables/columns have pairwise correlation 0.5 on the population level
+  X <- scale(X) # otherwise variance of columns wouldn't be 1
+
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
-  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
-  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  Y <- as.vector(X %*% beta) + rnorm(m+100, 0, sigma0) # final linear model
+  sim <- list(Y=Y[1:m], X=X[1:m, ], beta=beta, G=G, Y.test=Y[(m+1):(m+100)], X.test=X[(m+1):(m+100), ])
   return(sim)
 }
 
@@ -494,64 +497,214 @@ sim_sr_gw <- function(m, p, nG, nzG, k, sigma0) {
     G <- sort(sample(1:nG, p, replace=TRUE))
   }
   
-  X <- matrix(rnorm(m*p, 0, 1), nrow=m, ncol=p)
+  x <- matrix(rnorm((m+100)*ngroups), nrow=m+100, ncol=ngroups)
+  x2 <- matrix(rnorm((m+100)*p), nrow=m+100, ncol=p)
+  for (j in 1:p) { # this gives us a matrix with groupwise correlation of 0.5 on the population level, features of different groups are independent
+    x2[, j] <- x2[, j] + x[, G[j]]
+  }
+  X <- scale(x2)
+
   nzgroups <- sample(1:nG, nzG) # we sample the non-zero groups
   whichbeta <- which(G%in%nzgroups) # get the indices of the non-zero groups
   beta[sample(whichbeta, min(length(whichbeta), k))] <- runif(min(length(whichbeta), k), -5, 5) # assign random values to k indices in the non-zero groups
-  Y <- as.vector(X %*% beta) + rnorm(m, 0, sigma0) # final linear model
-  sim <- list(Y=Y, X=X, beta=beta, G=G)
+  Y <- as.vector(X %*% beta) + rnorm(m+100, 0, sigma0) # final linear model
+  sim <- list(Y=Y[1:m], X=X[1:m, ], beta=beta, G=G, Y.test=Y[(m+1):(m+100)], X.test=X[(m+1):(m+100), ])
   return(sim)
 }
 ```
 
+With these functions, we can simulate data to compare the performance of methods in the presence of different correlation structures:
+
 ``` r
-  auroc <- data.frame(value=numeric(), method=character(), corrstruct=character())
-  aupr <- data.frame(value=numeric(), method=character(), corrstruct=character())
-  prederror <- data.frame(value=numeric(), method=character(), corrstruct=character())
-  times <- data.frame(value=numeric(), method=character(), corrstruct=character())
+m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
 
-  method <- c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")
-
-  for (b in 1:B) {
-    for (m in 1:6) {
-      auroc <- rbind(auroc, data.frame(value=results[[b]]$onetwothree[[2]]$AUROC[m], method=method[m], corrstruct="nocorr"))
-      aupr <- rbind(aupr, data.frame(value=results[[b]]$onetwothree[[2]]$AUPR[m], method=method[m], corrstruct="nocorr"))
-      prederror <- rbind(prederror, data.frame(value=results[[b]]$onetwothree[[2]]$prederror[m], method=method[m], corrstruct="nocorr"))
-      times <- rbind(times, data.frame(value=results[[b]]$onetwothree[[2]]$times[m], method=names(results[[b]]$onetwothree[[2]]$times[m]), corrstruct="nocorr"))
-    }
-  }
-  for (b in 1:B) {
-    for (m in 1:6) {
-      auroc <- rbind(auroc, data.frame(value=results[[b]]$corr_struct[[1]]$AUROC[m], method=method[m], corrstruct="pw"))
-      aupr <- rbind(aupr, data.frame(value=results[[b]]$corr_struct[[1]]$AUPR[m], method=method[m], corrstruct="pw"))
-      prederror <- rbind(prederror, data.frame(value=results[[b]]$corr_struct[[1]]$prederror[m], method=method[m], corrstruct="pw"))
-      times <- rbind(times, data.frame(value=results[[b]]$corr_struct[[1]]$times[m], method=names(results[[b]]$corr_struct[[1]]$times[m]), corrstruct="pw"))
-    }
-  }
-  for (b in 1:B) {
-    for (m in 1:6) {
-      auroc <- rbind(auroc, data.frame(value=results[[b]]$corr_struct[[2]]$AUROC[m], method=method[m], corrstruct="gw"))
-      aupr <- rbind(aupr, data.frame(value=results[[b]]$corr_struct[[2]]$AUPR[m], method=method[m], corrstruct="gw"))
-      prederror <- rbind(prederror, data.frame(value=results[[b]]$corr_struct[[2]]$prederror[m], method=method[m], corrstruct="gw"))
-      times <- rbind(times, data.frame(value=results[[b]]$corr_struct[[2]]$times[m], method=names(results[[b]]$corr_struct[[2]]$times[m]), corrstruct="gw"))
-    }
-  }
-  
-  times$method <- factor(times$method, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss"), ordered=TRUE)
-  
-  Ed_palette <- Ed_palette[7:9]
-
-  plot_auroc <- ggplot(aes(y = value, x = method, fill = corrstruct), data = auroc) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + scale_fill_Ed() + theme(axis.title.x=element_blank()) + ylab("AUROC")
-  plot_aupr <- ggplot(aes(y = value, x = method, fill = corrstruct), data = aupr) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + scale_fill_Ed() + theme(axis.title.x=element_blank()) + ylab("AUPR")
-  plot_prederror <- ggplot(aes(y = value, x = method, fill = corrstruct), data = prederror) + geom_boxplot(alpha=0.6) + theme_Ed() + scale_fill_Ed() + theme(axis.title.x=element_blank()) + ylab("pred. error") + ylim(0, 1.5) # + scale_y_log10()
-  plot_times <- ggplot(aes(y = value, x = method, fill = corrstruct), data = times) + geom_boxplot(alpha=0.6) + theme_Ed() + theme(axis.title.x=element_blank()) + ylab("time (log-scale)") + labs(fill="corr. struct.") + scale_y_log10() +  scale_fill_manual(values=Ed_palette[1:3], name="corr. struct.", breaks=c("nocorr", "pw", "gw"), labels=c("no corr.", "pairwise", "groupwise")) 
-
-  grid_arrange_shared_legend(plot_auroc, plot_aupr, plot_prederror, plot_times, ncol = 2, nrow = 2, which.legend = 4)
+results_corrstruct <- list()
+results_corrstruct[[1]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0, ncores=ncores, B=B, simfunction=sim_signalrecovery) # we did this before, no correlation
+results_corrstruct[[2]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=0.1, ncores=ncores, B=B, simfunction=sim_sr_pw) # global pairwise correlation
+results_corrstruct[[3]] <- parallel_signalrecovery(m=m, p=p, nG=nG, nzG=nzG, k=k, sigma0=1, ncores=ncores, B=B, simfunction=sim_sr_gw) # groupwise pairwise correlation
 ```
 
-contents, F7
+Or, just load the provided RData:
+
+``` r
+load("results_sr_corrstruct.RData")
+```
+
+Next we will plot the results, with a side-by-side boxplot:
+
+``` r
+auroc <- data.frame(value=numeric(), method=character(), corrstruct=character())
+aupr <- data.frame(value=numeric(), method=character(), corrstruct=character())
+prederror <- data.frame(value=numeric(), method=character(), corrstruct=character())
+times <- data.frame(value=numeric(), method=character(), corrstruct=character())
+
+method <- c("dogss", "ssep", "sgl", "gglasso", "lasso", "bsgsss")
+corrstruct <- c("nocorr", "pw", "gw")
+for (cs in 1:3) {
+  for (b in 1:B) {
+  for (mt in 1:6) {
+    auroc <- rbind(auroc, data.frame(value=results_corrstruct[[cs]][[b]]$AUROC[mt], method=method[mt], corrstruct=corrstruct[cs]))
+    aupr <- rbind(aupr, data.frame(value=results_corrstruct[[cs]][[b]]$AUPR[mt], method=method[mt], corrstruct=corrstruct[cs]))
+    prederror <- rbind(prederror, data.frame(value=results_corrstruct[[cs]][[b]]$prederror[mt], method=method[mt], corrstruct=corrstruct[cs]))
+    times <- rbind(times, data.frame(value=results_corrstruct[[cs]][[b]]$times[mt], method=method[mt], corrstruct=corrstruct[cs]))
+  }
+}
+}
+
+plot_auroc <- ggplot(aes(y = value, x = method, fill = corrstruct), data = auroc) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + theme(axis.title.x=element_blank()) + ylab("AUROC") + scale_fill_manual(values=Ed_palette[7:9])
+plot_aupr <- ggplot(aes(y = value, x = method, fill = corrstruct), data = aupr) + geom_boxplot(alpha=0.6) + theme_Ed() + ylim(0, 1) + theme(axis.title.x=element_blank()) + ylab("AUPR") + scale_fill_manual(values=Ed_palette[7:9])
+plot_prederror <- ggplot(aes(y = value, x = method, fill = corrstruct), data = prederror) + geom_boxplot(alpha=0.6) + theme_Ed() + theme(axis.title.x=element_blank()) + ylab("pred. error") + scale_fill_manual(values=Ed_palette[7:9]) # + ylim(0, 1.5) # + scale_y_log10()
+plot_times <- ggplot(aes(y = value, x = method, fill = corrstruct), data = times) + geom_boxplot(alpha=0.6) + theme_Ed() + theme(axis.title.x=element_blank()) + ylab("time (log-scale)") + labs(fill="corr. struct.") + scale_y_log10() +  scale_fill_manual(values=Ed_palette[7:9], name="corr. struct.", breaks=c("nocorr", "pw", "gw"), labels=c("no corr.", "pairwise", "groupwise")) 
+
+grid_arrange_shared_legend(plot_auroc, plot_aupr, plot_prederror, plot_times, ncol = 2, nrow = 2, which.legend = 4)
+```
+
+![](signal_recovery_files/figure-markdown_github/figure7-1.png)
 
 Slab parameter
 --------------
 
-contents, F8
+Here we will shortly analyze how the proposed "dogss" method and the simple spike-and-slab approach depend on the slab parameter, which needs to be specified for both methods. To this end, we generate data and apply dogss and ssep with six different values of **sigma\_slab**:
+
+``` r
+Sigma_slab <- c(0.5, 1, 2, 5, 10, 100)
+m <- 30; p <- 100; nG <- 20; nzG <- 3; k <- 10
+```
+
+We simulate and evaluate on multiple cores again:
+
+``` r
+ncores <- 50; B <- 100
+
+ncl <- detectCores()
+ncl <- min(ncl, ncores)
+
+myCluster <- makeCluster(ncl)
+registerDoParallel(myCluster)
+
+results_slab <- foreach (b=1:B, .packages=c("dogss", "DescTools")) %dopar% {
+  sim <- sim_signalrecovery(m, p, nG, nzG, k, sigma0)
+  
+  six_slabs <- vector("list", 6)
+  
+  X <- sim$X; Y <- sim$Y; beta <- sim$beta; G <- sim$G
+  sizegroups <- sapply(1:nG, function(g) sum(G==g)) # we will need the group sizes for BSGSSS
+  
+  # test data for the prediction
+  X.test <- sim$X.test
+  Y.test <- sim$Y.test
+  
+  for (i in seq(Sigma_slab)) {
+    sigma_slab <- Sigma_slab[i]
+    times <- rep(0, 2)
+    names(times) <- c("dogss", "ssep") 
+    
+    times["dogss"] <- system.time(results_dogss <- cv_dogss(X,Y,G, sigma_slab = sigma_slab))[1] 
+    times["ssep"] <- system.time(results_ssep <- cv_dogss(X,Y,G=NULL, sigma_slab = sigma_slab))[1] 
+    
+    TPR <- matrix(0, nrow=length(G), ncol=2, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep")))
+    FPR <- matrix(0, nrow=length(G), ncol=2, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep")))
+    Prec <- matrix(0, nrow=length(G), ncol=2, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep")))
+    
+    rankedlist <- matrix(0, nrow=length(G), ncol=2, dimnames=list(nfeat=1:length(G), method=c("dogss", "ssep")))
+    rankedlist[, "dogss"] <- rank(1-results_dogss$p_final, ties="min")
+    rankedlist[, "ssep"] <- rank(1-results_ssep$p_final, ties="min")
+    
+    for (r in 1:dim(rankedlist)[1]) {
+      TPR[r, ] <- apply(rankedlist, 2, function(s) sum(beta[s<=r]!=0))
+      FPR[r, ] <- apply(rankedlist, 2, function(s) sum(beta[s<=r]==0))
+      Prec[r, ] <- TPR[r, ]/apply(rankedlist, 2, function(s) sum(s<=r))
+    }
+    TPR <- TPR/sum(beta!=0)
+    FPR <- FPR/sum(beta==0)
+    
+    AUROC <- sapply(c("dogss", "ssep"), function(m) AUC(c(0,FPR[, m],1), c(0,TPR[, m],1)))
+    AUPR <- sapply(c("dogss", "ssep"), function(m) AUC(c(0,TPR[, m],1), c(1,Prec[, m],0)))
+    
+    # calculate pred error of Y on test data with the cross validated coefficient vectors:
+    prederror <- rep(0, 2)
+    names(prederror) <- c("dogss", "ssep")
+    normY.test <- sum(Y.test^2)
+    prederror["dogss"] <- sum((X.test%*%results_dogss$m_cv-Y.test)^2)/normY.test
+    prederror["ssep"] <- sum((X.test%*%results_ssep$m_cv-Y.test)^2)/normY.test
+    
+    six_slabs[[i]] <- list(AUROC=AUROC, AUPR=AUPR, prederror=prederror, times=times)
+  }
+  six_slabs
+}
+stopCluster(myCluster)
+```
+
+Or load the data:
+
+``` r
+load("results_sr_slab.RData")
+```
+
+We will asses the performance with line plots, which is Figure 8 in the publication:
+
+``` r
+auroc_slab <- matrix(0, nrow=6, ncol=2, dimnames=list(slab=Sigma_slab, method=c("dogss", "ssep")))
+aupr_slab <- matrix(0, nrow=6, ncol=2, dimnames=list(slab=Sigma_slab, method=c("dogss", "ssep")))
+prederror_slab <- matrix(0, nrow=6, ncol=2, dimnames=list(slab=Sigma_slab, method=c("dogss", "ssep")))
+times_slab <- matrix(0, nrow=6, ncol=2, dimnames=list(slab=Sigma_slab, method=c("dogss", "ssep")))
+for (i in 1:6) {
+  auroc <- matrix(0, nrow=B, ncol=2)
+  colnames(auroc) <- c("dogss", "ssep")
+  aupr <- auroc
+  prederror <- matrix(0, nrow=B, ncol=2)
+  colnames(prederror) <- c("dogss", "ssep")
+  times <- matrix(0, nrow=B, ncol=2)
+  colnames(times) <- c("dogss", "ssep")
+  
+  for (b in 1:B) {
+    auroc[b, ] <- results_slab[[b]][[i]]$AUROC
+    aupr[b, ] <- results_slab[[b]][[i]]$AUPR
+    prederror[b, ] <- results_slab[[b]][[i]]$prederror
+    times[b, ] <- results_slab[[b]][[i]]$times
+  }
+  auroc_slab[i, ] <- apply(auroc, 2, median)
+  aupr_slab[i, ] <- apply(aupr, 2, median)
+  prederror_slab[i, ] <- apply(prederror, 2, median)
+  times_slab[i, ] <- apply(times, 2, median)
+}
+
+data <- rbind(data.frame(melt(auroc_slab), measure=rep("auroc", length(auroc_slab))), data.frame(melt(aupr_slab), measure=rep("aupr", length(aupr_slab))), data.frame(melt(prederror_slab), measure=rep("prederror", length(prederror_slab))), data.frame(melt(times_slab), measure=rep("times", length(times_slab))))
+data$method <- factor(data$method, ordered=TRUE, levels=c("dogss", "ssep"))
+
+auroc_data <- subset(data, measure=="auroc")
+P_auroc <- ggplot(auroc_data, aes(x=as.factor(slab), y=value, group=method, colour=method)) +
+  geom_line(size=1.3) +
+  ylim(0, 1) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="slab", y="AUROC", colour="method")
+
+aupr_data <- subset(data, measure=="aupr")
+P_aupr <- ggplot(aupr_data, aes(x=as.factor(slab), y=value, group=method, colour=method)) +
+  geom_line(size=1.3) +
+  ylim(0, 1) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="slab", y="AUPR", colour="method")
+
+prederror_data <- subset(data, measure=="prederror")
+P_prederror <- ggplot(prederror_data, aes(x=as.factor(slab), y=value, group=method, colour=method)) +
+  geom_line(size=1.3) +
+  ylim(0, max(prederror_slab, 1)) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="slab", y="pred. error", colour="method")
+
+times_data <- subset(data, measure=="times")
+P_times <- ggplot(times_data, aes(x=as.factor(slab), y=value, group=method, colour=method)) +
+  geom_line(size=1.3) +
+  ylim(0, max(times_slab)) +
+  theme_Ed() +
+  scale_colour_Ed() +
+  labs(x="slab", y="time", colour="method")
+
+grid_arrange_shared_legend(P_auroc, P_aupr, P_prederror, P_times, ncol = 2, nrow = 2, which.legend = 4)
+```
+
+![](signal_recovery_files/figure-markdown_github/figure8-1.png)
