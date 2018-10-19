@@ -45,7 +45,7 @@ ncores <- 50 # number of cores used for parallelization
 ```
 
 
-## Simulation
+## Simulations
 
 We show how to simulate data for signal recovery. This data will be used in the next section.
 
