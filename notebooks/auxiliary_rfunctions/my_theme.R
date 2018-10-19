@@ -23,7 +23,8 @@ theme_Ed <- function(base_size=14) { #
             legend.text = element_text(size=rel(1)),
             plot.margin=unit(c(5,5,5,5),"mm"),
             strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-            strip.text = element_text(face="bold")
+            strip.text = element_text(face="bold"),
+            aspect.ratio=1
     ))
 }
 
