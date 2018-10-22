@@ -56,6 +56,644 @@ example network
 
 ## Sim networks
 
+```{r}
+library(mvtnorm)
+library(qpgraph)
+library(sparseMVN)
+library(psych)
+
+library(SGL)
+library(gglasso)
+library(glmnet)
+library(dogss2)
+
+library(DescTools)
+library(methods)
+library(Matrix)
+
+library(foreach)
+library(doParallel)
+
+source("/project/dogss/my_cvSGL.R")
+
+##### simulation of kind-of scale-free network graph
+cK <- c(100, 1000, 5000) # 100 # number of genes total
+cTF <- c(10, 100, 500) # number of transcription factors/hubs
+cBG <- c(3, 20, 50) # 10 # number of "big groups"
+cq <- c(0.01, 0.001, 0.0002) # 20/((S*BG)*(K-1))
+# sigma_0 <- 0.1
+
+B <- 100
+
+ncores <- 50
+
+# generate the network graphs and data
+ncl <- detectCores()
+ncl <- min(ncl, ncores)
+myCluster1 <- makeCluster(ncl, outfile="/project/dogss/tests_thesis/log_02_networkreconstruction_generate.txt")
+registerDoParallel(myCluster1)
+networks <- foreach (b=1:B, .packages=c("sparseMVN", "psych", "Matrix", "mvtnorm", "qpgraph"), .errorhandling='pass') %dopar% {
+  cat(b, "\n")
+  for (i in 1:2) {
+
+    K <- cK[i]
+    BG <- cBG[i]
+    q <- cq[i]
+    ntfs <- cTF[i]
+
+    genes <- paste0("G", 1:K)
+    TFs <- sample(genes, ntfs)
+    partitions <- vector("integer", K)
+    names(partitions) <- genes
+    partitions[TFs[1:BG]] <- 1:BG
+    partitions[TFs[(BG+1):ntfs]] <- sample(1:BG, ntfs-BG, replace=TRUE)
+    probsBG <- runif(BG) # probs for big groups to get different sizes
+    partitions[!(genes%in%TFs)] <- sample(1:BG, K-ntfs, replace=TRUE, prob=probsBG) # every node gets assigned a big group
+    connectlist <- c(0, 0)
+
+    for (g in genes) {
+      potentialTFs <- names(partitions[TFs][partitions[TFs]==partitions[g]])
+      if (sum(potentialTFs!=g)!=0) {
+        firstconnect <- sample(potentialTFs[potentialTFs!=g], 1)
+        connectlist <- rbind(connectlist, c(firstconnect, g))
+        for (tf in potentialTFs[!potentialTFs%in%c(firstconnect, g)]) {
+          if (runif(1)<0.5) connectlist <- rbind(connectlist, c(tf, g))
+        }
+      }
+      for (h in TFs) { # here we add random edges
+        if (runif(1) <= q & h != g) connectlist <- rbind(connectlist, c(h, g)) # c(fromTF, toGene)
+      }
+    }
+    connectlist <- connectlist[-1, ]
+
+    dat.sort <- t(apply(connectlist, 1, sort))
+    newconnectlist <- connectlist[!duplicated(dat.sort), ] # remove duplicated. don't ask me why this works, stackoverflow
+
+    truth_matrix <- matrix(0, nrow=length(partitions), ncol=length(partitions), dimnames=list(from=names(partitions), to=names(partitions)))
+    # BETA <- truth_matrix
+    # prec_matrix <- truth_matrix
+    for (j in 1:dim(newconnectlist)[1]) {
+      truth_matrix[newconnectlist[j, 1], newconnectlist[j, 2]] <- 1
+      truth_matrix[newconnectlist[j, 2], newconnectlist[j, 1]] <- 1
+      # thisminusbeta <- rnorm(1) # runif(1, -5, 5)# sample(c(runif(1,-5,-1), runif(1, 1, 5)), 1)
+      # prec_matrix[newconnectlist[j, 1], newconnectlist[j, 2]] <- thisminusbeta
+      # prec_matrix[newconnectlist[j, 2], newconnectlist[j, 1]] <- thisminusbeta
+    }
+    # diag(prec_matrix) <- 1000 # rnorm(length(diag(prec_matrix))) # runif(length(diag(prec_matrix)), -5, 5)
+    # H2 <- glb.algebraic(prec_matrix)$solution
+    # diag(prec_matrix) <- H2 + 0.01
+
+    # for (j in seq(dim(BETA)[2])) BETA[, j] <- -prec_matrix[, j]/prec_matrix[j, j]
+    # diag(BETA) <- 0
+
+    truth_matrix <- as.matrix(as(truth_matrix, "symmetricMatrix"))
+    mygraph <- rUGgmm(truth_matrix)
+    prec_matrix <- solve(mygraph$sigma)
+    geneexpr <- rmvnorm(200, mygraph)
+    dimnames(prec_matrix) <- list(from=colnames(geneexpr), to=colnames(geneexpr))
+    geneexpr <- geneexpr[, genes]
+    prec_matrix <- prec_matrix[, genes]; prec_matrix <- prec_matrix[genes, ]
+    pm_nz <- truth_matrix
+    diag(pm_nz) <- 1
+    prec_matrix[pm_nz!=1] <- 0
+    
+    # prec_matrix <- Matrix(as(prec_matrix, "symmetricMatrix"), sparse=TRUE)
+
+    # geneexpr <- rmvn.sparse(200, rep(0, dim(prec_matrix)[1]), Cholesky(prec_matrix)) # + rnorm(200*dim(prec_matrix)[1], 0, sigma_0)
+    # colnames(geneexpr) <- genes
+
+    train <- 1:100
+    test <- 101:200
+
+    geneexpr_train <- geneexpr[train, ]
+    geneexpr_test <- geneexpr[test, ]
+
+    G <- partitions[TFs]
+    ngenes <- dim(geneexpr)[2]
+    nobs <- 100 # dim(geneexpr)[1]
+    # ntfs <- length(tfs)
+    neffs <- sum(truth_matrix[TFs, ])
+
+    save(mygraph, geneexpr, geneexpr_train, geneexpr_test, prec_matrix, genes, TFs, G, ngenes, nobs, ntfs, truth_matrix, neffs, partitions, file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/sim_network_", b, "_", i, ".RData")) # save.image funktioniert mit foreach nicht... # Graph, exps, lambdapath
+  }
+  b
+}
+stopCluster(myCluster1)
+save.image(file="/project/dogss/tests_thesis/02_networkreconstruction_generate.RData")
+
+# reconstruct the networks!
+ncl <- detectCores()
+ncl <- min(ncl, ncores)
+myCluster <- makeCluster(ncl, outfile="/project/dogss/tests_thesis/log_02_networkreconstruction.txt")
+registerDoParallel(myCluster)
+
+results <- foreach (b=1:B, .packages=c("dogss2", "gglasso", "SGL", "glmnet", "DescTools"), .errorhandling='pass') %dopar% {
+  cat("b=", b, "\n")
+  onetwothree <- vector("list", 3)
+  gr_cl_rd <- vector("list", 3)
+  
+  for (i in 1:2) { # different scenarios for number of observations, groups etc
+    cat("b=", b, ", i=", i, "\n")
+    
+    load(file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/sim_network_", b, "_", i, ".RData"))
+    
+    results_simnetwork <- list()
+    
+    for (g in genes) {
+      # cat("\nGene ", g, "\n")
+      Y <- as.vector(geneexpr_train[, g]) # as.vector(geneexpr_center_train[, g])
+      index <- as.integer(G)[!(names(G) %in% g)]
+      names(index) <- names(G)[!(names(G) %in% g)]
+      x <- geneexpr_train[, names(index)] # geneexpr_scale_train[, names(index)]
+      
+      groups <- unique(index)
+      ngroups <- length(groups)
+      nG <- ngroups
+      nngroups <- sapply(groups, function(g) sum(index==g))
+      
+      while (max(groups) != ngroups) { # this is for gglasso which needs consecutively numbered groups :-/
+        del <- max(groups)
+        index[index==del] <- which.min(1:nG %in% groups) # this is superweird :D
+        groups <- unique(index)
+        ngroups <- length(groups)
+        nngroups <- sapply(groups, function(g) sum(index==g))
+      }
+      
+      if (is.vector(x)) x <- as.matrix(x, ncol=1)
+      
+      res_dogss <- cv_dogss(x, Y, G=index, tol=1e-03)
+      res_ssep <- cv_dogss(x, Y, G=NULL, tol=1e-03)
+      res_sgl <- tryCatch(my_cvSGL(data=list(x=x, y=Y), index=index, standardize=FALSE, thresh=1e-03, maxit=1000), error=function(e) NULL)
+      res_gglasso <- cv.gglasso(x=x, y=Y, group=index, nfolds=10, intercept=FALSE, eps=1e-03, maxit=1000)
+      res_lasso <- tryCatch(cv.glmnet(x, Y, standardize=FALSE, intercept=FALSE, thresh=1e-03, maxit=1000), error=function(e) NULL)
+      
+      res_sgl$lambda <- res_sgl$fit$lambdas
+      
+      if (is.null(res_sgl)) res_sgl <- res_gglasso # in this case (only one feature) the three methods are equivalent, but only gglasso gives results
+      if (is.null(res_lasso)) res_lasso <- res_gglasso
+      
+      res_sgl$mylambda <- apply(res_sgl$fit$beta, 1, function(b) res_sgl$lambda[which(b!=0)[1]])
+      res_gglasso$mylambda <- apply(res_gglasso$gglasso.fit$beta, 1, function(b) res_gglasso$lambda[which(b!=0)][1])
+      res_lasso$mylambda <- apply(res_lasso$glmnet.fit$beta, 1, function(b) res_lasso$lambda[which(b!=0)[1]])
+      
+      scores <- cbind(dogss=res_dogss$p_final, ssep=res_ssep$p_final, sgl=res_sgl$mylambda, gglasso=res_gglasso$mylambda, lasso=res_lasso$mylambda) # ...$areascore # ...$p_final # ,
+      row.names(scores) <- names(index)
+      results_simnetwork[[g]] <- list(scores=scores, results=list(dogss=res_dogss, ssep=res_ssep, sgl=res_sgl, gglasso=res_gglasso, lasso=res_lasso))
+    }
+    
+    save(results_simnetwork, file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/results_network_onetwothree_", i, "_", b, ".RData"))
+    
+    scorelist <- data.frame(to=character(), from=character(), dogss=numeric(), ssep=numeric(), sgl=numeric(), gglasso=numeric(), lasso=numeric(), stringsAsFactors=FALSE) # ,
+    for (g in genes) {
+      scorelist <- rbind(scorelist, data.frame(to=as.character(rep(g, dim(results_simnetwork[[g]]$scores)[1])), from=as.character(rownames(results_simnetwork[[g]]$scores)), dogss=results_simnetwork[[g]]$scores[, "dogss"], ssep=results_simnetwork[[g]]$scores[, "ssep"], sgl=results_simnetwork[[g]]$scores[, "sgl"], gglasso=results_simnetwork[[g]]$scores[, "gglasso"], lasso=results_simnetwork[[g]]$scores[, "lasso"],stringsAsFactors=FALSE)) #
+    }
+    ranks <- apply(scorelist[, 3:7], 2, function(r) rank(1-r, ties.method="min"))
+    pairs <- scorelist[, c(1,2)]
+    truth_pairs <- rep(0, dim(pairs)[1])
+    recov_matrices <- list()
+    prec_matrices <- list()
+    methods <- c("dogss", "ssep", "sgl", "gglasso", "lasso") #
+    for (m in methods) recov_matrices[[m]] <- matrix(0, nrow=ntfs, ncol=dim(truth_matrix)[2], dimnames=list(from=TFs, to=colnames(truth_matrix)))
+    for (m in methods) prec_matrices[[m]] <- matrix(0, nrow=dim(truth_matrix)[1], ncol=dim(truth_matrix)[2], dimnames=list(from=rownames(truth_matrix), to=colnames(truth_matrix)))
+    for (j in 1:length(truth_pairs)) {
+      truth_pairs[j] <- truth_matrix[pairs[j,2], pairs[j,1]]
+      for (m in methods) {
+        recov_matrices[[m]][pairs[j,2], pairs[j,1]] <- ranks[j, m]
+      }
+    } 
+    
+    # rocstuff
+    K <- length(truth_pairs)
+    P <- sum(truth_matrix[TFs, ])
+    N <- ntfs*ngenes-ntfs-P
+    
+    M <- length(methods)
+    
+    tpr <- matrix(0, K, M)
+    fpr <- matrix(0, K, M)
+    precision <- matrix(0, K, M)
+    
+    for (m in 1:M) {
+      truth_ordered <- truth_matrix[TFs, ][order(recov_matrices[[m]])][-c(1:ntfs)]
+      tpr[, m] <- cumsum(truth_ordered)/P
+      fpr[, m] <- cumsum(!truth_ordered)/N
+      precision[, m] <- tpr[, m]*P/(tpr[, m]*P + fpr[, m]*N)
+    }
+    AUROC <- sapply(1:length(methods), function(m) AUC(c(0,fpr[, m],1), c(0,tpr[, m],1)))
+    AUPR <- sapply(1:length(methods), function(m) AUC(c(0,tpr[, m],1), c(1,precision[, m],0)))
+    
+    # prediction stuff 
+    X_test <- geneexpr_test[, TFs] # geneexpr_scale_test[, tfs]
+    prederror <- rep(0, 5)
+    names(prederror) <- c("dogss", "ssep", "sgl", "gglasso", "lasso")
+    precm_errors <- prederror
+    normPM <- norm(prec_matrix, "1")
+    BETA_dogss <- truth_matrix[TFs, ]
+    BETA_dogss[, ] <- 0
+    BETA_ssep <- BETA_dogss
+    BETA_sgl <- BETA_dogss
+    BETA_gglasso <- BETA_dogss
+    BETA_lasso <- BETA_dogss
+    
+    X <- X_test[, TFs]
+    
+    for (g in genes) {
+      Y <- geneexpr_test[, g] # geneexpr_center_test[, g]
+      sumY2 <- sum(Y^2)
+      
+      res_dogss <- results_simnetwork[[g]]$results$dogss
+      res_ssep <- results_simnetwork[[g]]$results$ssep
+      res_sgl <- results_simnetwork[[g]]$results$sgl
+      res_lasso <- results_simnetwork[[g]]$results$lasso
+      res_gglasso <- results_simnetwork[[g]]$results$gglasso
+      names(res_dogss$m_cv) <- TFs[TFs!=g]
+      names(res_ssep$m_cv) <- TFs[TFs!=g]
+      names(res_sgl$beta) <- TFs[TFs!=g]
+      BETA_dogss[TFs[!(TFs %in% g)], g] <- res_dogss$m_cv[TFs[!(TFs %in% g)]]
+      BETA_ssep[TFs[!(TFs %in% g)], g] <- res_ssep$m_cv[TFs[!(TFs %in% g)]]
+      BETA_sgl[TFs[!(TFs %in% g)], g] <- res_sgl$beta[TFs[!(TFs %in% g)]]
+      BETA_gglasso[TFs[!(TFs %in% g)], g] <- res_gglasso$gglasso.fit$beta[, which(res_gglasso$lambda==res_gglasso$lambda.1se)][TFs[!(TFs %in% g)]]
+      BETA_lasso[TFs[!(TFs %in% g)], g] <- res_lasso$glmnet.fit$beta[, which(res_lasso$lambda==res_lasso$lambda.1se)][TFs[!(TFs %in% g)]]
+      
+      if (!(g%in%TFs)) {
+        prederror["dogss"] <- prederror["dogss"] + sum((Y-X%*%BETA_dogss[, g])^2)/sumY2
+        prederror["ssep"] <- prederror["ssep"] + sum((Y-X%*%BETA_ssep[, g])^2)/sumY2
+        prederror["sgl"] <- prederror["sgl"] + sum((Y-X%*%BETA_sgl[, g])^2)/sumY2
+        prederror["gglasso"] <- prederror["gglasso"] + sum((Y-X%*%BETA_gglasso[, g])^2)/sumY2
+        prederror["lasso"] <- prederror["lasso"] + sum((Y-X%*%BETA_lasso[, g])^2)/sumY2
+      }
+      
+      prec_matrices[["dogss"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_dogss[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["dogss"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["dogss"]][g, g] * BETA_dogss[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["dogss"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["dogss"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["ssep"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_ssep[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["ssep"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["ssep"]][g, g] * BETA_ssep[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["ssep"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["ssep"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["sgl"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_sgl[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["sgl"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["sgl"]][g, g] * BETA_sgl[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["sgl"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["sgl"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["gglasso"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_gglasso[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["gglasso"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["gglasso"]][g, g] * BETA_gglasso[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["gglasso"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["gglasso"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["lasso"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_lasso[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["lasso"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["lasso"]][g, g] * BETA_lasso[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["lasso"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["lasso"]][TFs[!(TFs %in% g)], g]
+      
+    }
+    prederror <- prederror/length(genes[!(genes%in%TFs)])
+    for (m in methods) {
+      precm_errors[m] <- norm(prec_matrix-prec_matrices[[m]], "1")/normPM
+    } 
+    
+    onetwothree[[i]] <- list(TPR=tpr, FPR=fpr, Prec=precision, AUROC=AUROC, AUPR=AUPR, prederror=prederror, precm_errors=precm_errors, times=times) # , results_simnetwork=results_simnetwork # 
+  }
+  save(onetwothree, file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/net_onetwothree_", b, ".RData"))
+  
+  #### jetzt noch der different groups stuff fuer das zweite scenario
+  
+  load(file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/sim_network_", b, "_", 2, ".RData"))
+  
+  for (dg in 2:3) { # calculate results for different groupings: clustered, random
+    
+    results_simnetwork <- list()
+    
+    if (dg==2) {
+      G_new <- kmeans(t(geneexpr[, TFs]), length(unique(G)))$cluster
+      cat("kmeans!", " b=", b, "\n")
+    } else { # (dg==3)
+      G_new <- sample(G)
+      names(G_new) <- names(G)
+      cat("random!", " b=", b, "\n")
+    }
+    
+
+    
+    for (g in genes) {
+      # cat("\nGene ", g, "\n")
+      Y <- as.vector(geneexpr_train[, g]) # as.vector(geneexpr_center_train[, g])
+      index <- as.integer(G_new)[!(names(G_new) %in% g)]
+      names(index) <- names(G_new)[!(names(G_new) %in% g)]
+      x <- geneexpr_train[, names(index)] # geneexpr_scale_train[, names(index)]
+      
+      groups <- unique(index)
+      ngroups <- length(groups)
+      nG <- ngroups
+      nngroups <- sapply(groups, function(g) sum(index==g))
+      
+      while (max(groups) != ngroups) { # this is for gglasso which needs consecutively numbered groups :-/
+        del <- max(groups)
+        index[index==del] <- which.min(1:nG %in% groups) # this is superweird :D
+        groups <- unique(index)
+        ngroups <- length(groups)
+        nngroups <- sapply(groups, function(g) sum(index==g))
+      }
+      
+      if (is.vector(x)) x <- as.matrix(x, ncol=1)
+      
+      
+    res_dogss <- cv_dogss(x, Y, G=index, tol=1e-03)
+    res_ssep <- cv_dogss(x, Y, G=NULL, tol=1e-03)
+    res_sgl <- tryCatch(my_cvSGL(data=list(x=x, y=Y), index=index, standardize=FALSE, thresh=1e-03, maxit=1000), error=function(e) NULL)
+    res_gglasso <- cv.gglasso(x=x, y=Y, group=index, nfolds=10, intercept=FALSE, eps=1e-03, maxit=1000)
+    res_lasso <- tryCatch(cv.glmnet(x, Y, standardize=FALSE, intercept=FALSE, thresh=1e-03, maxit=1000), error=function(e) NULL)
+      
+      res_sgl$lambda <- res_sgl$fit$lambdas
+      
+      if (is.null(res_sgl)) res_sgl <- res_gglasso # in this case (only one feature) the three methods are equivalent, but only gglasso gives results
+      if (is.null(res_lasso)) res_lasso <- res_gglasso
+      
+    res_sgl$mylambda <- apply(res_sgl$fit$beta, 1, function(b) res_sgl$lambda[which(b!=0)[1]])
+    res_gglasso$mylambda <- apply(res_gglasso$gglasso.fit$beta, 1, function(b) res_gglasso$lambda[which(b!=0)][1])
+    res_lasso$mylambda <- apply(res_lasso$glmnet.fit$beta, 1, function(b) res_lasso$lambda[which(b!=0)[1]])
+      
+      scores <- cbind(dogss=res_dogss$p_final, ssep=res_ssep$p_final, sgl=res_sgl$mylambda, gglasso=res_gglasso$mylambda, lasso=res_lasso$mylambda) # ...$areascore # ...$p_final # ,
+      row.names(scores) <- names(index)
+      results_simnetwork[[g]] <- list(scores=scores, results=list(dogss=res_dogss, ssep=res_ssep, sgl=res_sgl, gglasso=res_gglasso, lasso=res_lasso))
+    }
+    
+    save(results_simnetwork, file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/results_network_grclrd_", dg, "_", b, ".RData"))
+    
+    scorelist <- data.frame(to=character(), from=character(), dogss=numeric(), ssep=numeric(), sgl=numeric(), gglasso=numeric(), lasso=numeric(), stringsAsFactors=FALSE) # ,
+    for (g in genes) {
+      scorelist <- rbind(scorelist, data.frame(to=as.character(rep(g, dim(results_simnetwork[[g]]$scores)[1])), from=as.character(rownames(results_simnetwork[[g]]$scores)), dogss=results_simnetwork[[g]]$scores[, "dogss"], ssep=results_simnetwork[[g]]$scores[, "ssep"], sgl=results_simnetwork[[g]]$scores[, "sgl"], gglasso=results_simnetwork[[g]]$scores[, "gglasso"], lasso=results_simnetwork[[g]]$scores[, "lasso"],stringsAsFactors=FALSE)) #
+    }
+    ranks <- apply(scorelist[, 3:7], 2, function(r) rank(1-r, ties.method="min"))
+    pairs <- scorelist[, c(1,2)]
+    truth_pairs <- rep(0, dim(pairs)[1])
+    recov_matrices <- list()
+    prec_matrices <- list()
+    methods <- c("dogss", "ssep", "sgl", "gglasso", "lasso") #
+    for (m in methods) recov_matrices[[m]] <- matrix(0, nrow=ntfs, ncol=dim(truth_matrix)[2], dimnames=list(from=TFs, to=colnames(truth_matrix)))
+    for (m in methods) prec_matrices[[m]] <- matrix(0, nrow=dim(truth_matrix)[1], ncol=dim(truth_matrix)[2], dimnames=list(from=rownames(truth_matrix), to=colnames(truth_matrix)))
+    for (j in 1:length(truth_pairs)) {
+      truth_pairs[j] <- truth_matrix[pairs[j,2], pairs[j,1]]
+      for (m in methods) {
+        recov_matrices[[m]][pairs[j,2], pairs[j,1]] <- ranks[j, m]
+      }
+    } 
+    
+    # rocstuff
+    K <- length(truth_pairs)
+    P <- sum(truth_matrix[TFs, ])
+    N <- ntfs*ngenes-ntfs-P
+    
+    M <- length(methods)
+    
+    tpr <- matrix(0, K, M)
+    fpr <- matrix(0, K, M)
+    precision <- matrix(0, K, M)
+    
+    for (m in 1:M) {
+      truth_ordered <- truth_matrix[TFs, ][order(recov_matrices[[m]])][-c(1:ntfs)]
+      tpr[, m] <- cumsum(truth_ordered)/P
+      fpr[, m] <- cumsum(!truth_ordered)/N
+      precision[, m] <- tpr[, m]*P/(tpr[, m]*P + fpr[, m]*N)
+    }
+    AUROC <- sapply(1:length(methods), function(m) AUC(c(0,fpr[, m],1), c(0,tpr[, m],1)))
+    AUPR <- sapply(1:length(methods), function(m) AUC(c(0,tpr[, m],1), c(1,precision[, m],0)))
+    
+    # prediction stuff 
+    X_test <- geneexpr_test[, TFs] # geneexpr_scale_test[, tfs]
+    prederror <- rep(0, 5)
+    names(prederror) <- c("dogss", "ssep", "sgl", "gglasso", "lasso")
+    precm_errors <- prederror
+    normPM <- norm(prec_matrix, "1")
+    BETA_dogss <- truth_matrix[TFs, ]
+    BETA_dogss[, ] <- 0
+    BETA_ssep <- BETA_dogss
+    BETA_sgl <- BETA_dogss
+    BETA_gglasso <- BETA_dogss
+    BETA_lasso <- BETA_dogss
+    
+    X <- X_test[, TFs]
+    
+    for (g in genes) {
+      Y <- geneexpr_test[, g] # geneexpr_center_test[, g]
+      sumY2 <- sum(Y^2)
+      
+      res_dogss <- results_simnetwork[[g]]$results$dogss
+      res_ssep <- results_simnetwork[[g]]$results$ssep
+      res_sgl <- results_simnetwork[[g]]$results$sgl
+      res_lasso <- results_simnetwork[[g]]$results$lasso
+      res_gglasso <- results_simnetwork[[g]]$results$gglasso
+      names(res_dogss$m_cv) <- TFs[TFs!=g]
+      names(res_ssep$m_cv) <- TFs[TFs!=g]
+      names(res_sgl$beta) <- TFs[TFs!=g]
+      BETA_dogss[TFs[!(TFs %in% g)], g] <- res_dogss$m_cv[TFs[!(TFs %in% g)]]
+      BETA_ssep[TFs[!(TFs %in% g)], g] <- res_ssep$m_cv[TFs[!(TFs %in% g)]]
+      BETA_sgl[TFs[!(TFs %in% g)], g] <- res_sgl$beta[TFs[!(TFs %in% g)]]
+      BETA_gglasso[TFs[!(TFs %in% g)], g] <- res_gglasso$gglasso.fit$beta[, which(res_gglasso$lambda==res_gglasso$lambda.1se)][TFs[!(TFs %in% g)]]
+      BETA_lasso[TFs[!(TFs %in% g)], g] <- res_lasso$glmnet.fit$beta[, which(res_lasso$lambda==res_lasso$lambda.1se)][TFs[!(TFs %in% g)]]
+      
+      if (!(g%in%TFs)) {
+        prederror["dogss"] <- prederror["dogss"] + sum((Y-X%*%BETA_dogss[, g])^2)/sumY2
+        prederror["ssep"] <- prederror["ssep"] + sum((Y-X%*%BETA_ssep[, g])^2)/sumY2
+        prederror["sgl"] <- prederror["sgl"] + sum((Y-X%*%BETA_sgl[, g])^2)/sumY2
+        prederror["gglasso"] <- prederror["gglasso"] + sum((Y-X%*%BETA_gglasso[, g])^2)/sumY2
+        prederror["lasso"] <- prederror["lasso"] + sum((Y-X%*%BETA_lasso[, g])^2)/sumY2
+      }
+      
+      prec_matrices[["dogss"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_dogss[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["dogss"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["dogss"]][g, g] * BETA_dogss[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["dogss"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["dogss"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["ssep"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_ssep[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["ssep"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["ssep"]][g, g] * BETA_ssep[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["ssep"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["ssep"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["sgl"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_sgl[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["sgl"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["sgl"]][g, g] * BETA_sgl[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["sgl"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["sgl"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["gglasso"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_gglasso[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["gglasso"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["gglasso"]][g, g] * BETA_gglasso[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["gglasso"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["gglasso"]][TFs[!(TFs %in% g)], g]
+      
+      prec_matrices[["lasso"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, TFs[!(TFs %in% g)]] %*% BETA_lasso[, g][TFs[!(TFs %in% g)]])^2)
+      prec_matrices[["lasso"]][TFs[!(TFs %in% g)], g] <- -prec_matrices[["lasso"]][g, g] * BETA_lasso[, g][TFs[!(TFs %in% g)]]  # minus is important :)
+      prec_matrices[["lasso"]][g, TFs[!(TFs %in% g)]] <- prec_matrices[["lasso"]][TFs[!(TFs %in% g)], g]
+      
+    }
+    prederror <- prederror/length(genes[!(genes%in%TFs)])
+    for (m in methods) {
+      precm_errors[m] <- norm(prec_matrix-prec_matrices[[m]], "1")/normPM
+    } 
+    
+    gr_cl_rd[[dg]] <- list(TPR=tpr, FPR=fpr, Prec=precision, AUROC=AUROC, AUPR=AUPR, prederror=prederror, precm_errors=precm_errors, times=times)
+  } 
+  
+  ## dg=1 bzw whole groups (not only TFs...)
+  cat("whole groups... b=", b, "\n")
+  results_simnetwork <- list()
+  for (g in genes) {
+    # cat("\nGene ", g, "\n")
+    Y <- as.vector(geneexpr_train[, g]) # as.vector(geneexpr_center_train[, g])
+    index <- as.integer(partitions)[!(names(partitions) %in% g)]
+    names(index) <- names(partitions)[!(names(partitions) %in% g)]
+    x <- geneexpr_train[, names(index)] # geneexpr_scale_train[, names(index)]
+    
+    groups <- unique(index)
+    ngroups <- length(groups)
+    nG <- ngroups
+    nngroups <- sapply(groups, function(g) sum(index==g))
+    
+    while (max(groups) != ngroups) { # this is for gglasso which needs consecutively numbered groups :-/
+      del <- max(groups)
+      index[index==del] <- which.min(1:nG %in% groups) # this is superweird :D
+      groups <- unique(index)
+      ngroups <- length(groups)
+      nngroups <- sapply(groups, function(g) sum(index==g))
+    }
+    
+    if (is.vector(x)) x <- as.matrix(x, ncol=1)
+    
+    res_dogss <- cv_dogss(x, Y, G=index, tol=1e-03)
+    res_ssep <- cv_dogss(x, Y, G=NULL, tol=1e-03)
+    res_sgl <- tryCatch(my_cvSGL(data=list(x=x, y=Y), index=index, standardize=FALSE, thresh=1e-03, maxit=1000), error=function(e) NULL)
+    res_gglasso <- cv.gglasso(x=x, y=Y, group=index, nfolds=10, intercept=FALSE, eps=1e-03, maxit=1000)
+    res_lasso <- tryCatch(cv.glmnet(x, Y, standardize=FALSE, intercept=FALSE, thresh=1e-03, maxit=1000), error=function(e) NULL)
+    
+    res_sgl$lambda <- res_sgl$fit$lambdas
+    
+    if (is.null(res_sgl)) res_sgl <- res_gglasso # in this case (only one feature) the three methods are equivalent, but only gglasso gives results
+    if (is.null(res_lasso)) res_lasso <- res_gglasso
+    if (is.na(res_gglasso$lambda.1se)) {
+      whichmin <- which.min(res_gglasso$cvm)
+      res_gglasso$lambda.1se <- res_gglasso$lambda[which.max(res_gglasso$cvm<=res_gglasso$cvm[whichmin]+res_gglasso$cvsd[whichmin])]
+    }
+    
+    res_sgl$mylambda <- apply(res_sgl$fit$beta, 1, function(b) res_sgl$lambda[which(b!=0)[1]])
+    res_gglasso$mylambda <- apply(res_gglasso$gglasso.fit$beta, 1, function(b) res_gglasso$lambda[which(b!=0)][1])
+    res_lasso$mylambda <- apply(res_lasso$glmnet.fit$beta, 1, function(b) res_lasso$lambda[which(b!=0)[1]])
+    
+    scores <- cbind(dogss=res_dogss$p_final, ssep=res_ssep$p_final, sgl=res_sgl$mylambda, gglasso=res_gglasso$mylambda, lasso=res_lasso$mylambda) # ...$areascore # ...$p_final # ,
+    row.names(scores) <- names(index)
+    results_simnetwork[[g]] <- list(scores=scores, results=list(dogss=res_dogss, ssep=res_ssep, sgl=res_sgl, gglasso=res_gglasso, lasso=res_lasso))
+  }
+  
+  save(results_simnetwork, file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/results_network_grclrd_", 1, "_", b, ".RData"))
+  scorelist <- data.frame(to=character(), from=character(), dogss=numeric(), ssep=numeric(), sgl=numeric(), gglasso=numeric(), lasso=numeric(), stringsAsFactors=FALSE) # ,
+  for (g in genes) {
+    scorelist <- rbind(scorelist, data.frame(to=as.character(rep(g, dim(results_simnetwork[[g]]$scores)[1])), from=as.character(rownames(results_simnetwork[[g]]$scores)), dogss=results_simnetwork[[g]]$scores[, "dogss"], ssep=results_simnetwork[[g]]$scores[, "ssep"], sgl=results_simnetwork[[g]]$scores[, "sgl"], gglasso=results_simnetwork[[g]]$scores[, "gglasso"], lasso=results_simnetwork[[g]]$scores[, "lasso"],stringsAsFactors=FALSE)) #
+  }
+  ranks <- apply(scorelist[, 3:7], 2, function(r) rank(1-r, ties.method="min"))
+  pairs <- scorelist[, c(1,2)]
+  truth_pairs <- rep(0, dim(pairs)[1])
+  recov_matrices <- list()
+  methods <- c("dogss", "ssep", "sgl", "gglasso", "lasso") #
+  for (m in methods) recov_matrices[[m]] <- matrix(0, nrow=dim(truth_matrix)[1], ncol=dim(truth_matrix)[2], dimnames=list(from=rownames(truth_matrix), to=colnames(truth_matrix)))
+  prec_matrices <- recov_matrices
+  for (j in 1:length(truth_pairs)) {
+    truth_pairs[j] <- truth_matrix[pairs[j,2], pairs[j,1]]
+    for (m in methods) {
+      if (recov_matrices[[m]][pairs[j,2], pairs[j,1]]==0 | recov_matrices[[m]][pairs[j,2], pairs[j,1]] > ranks[j, m]) {
+        recov_matrices[[m]][pairs[j,2], pairs[j,1]] <- ranks[j, m]
+        recov_matrices[[m]][pairs[j,1], pairs[j,2]] <- ranks[j, m]
+      }
+    }
+  } 
+  
+  # rocstuff
+  K <- length(truth_pairs)/2
+  P <- sum(truth_matrix)/2
+  N <- (ngenes*ngenes-ngenes)/2-P
+  
+  M <- length(methods)
+  
+  tpr <- matrix(0, K, M)
+  fpr <- matrix(0, K, M)
+  precision <- matrix(0, K, M)
+  
+  for (m in 1:M) {
+    truth_ordered <- truth_matrix[upper.tri(truth_matrix, diag=FALSE)][order(recov_matrices[[m]][upper.tri(recov_matrices[[m]], diag = FALSE)])]
+    tpr[, m] <- cumsum(truth_ordered)/P
+    fpr[, m] <- cumsum(!truth_ordered)/N
+    precision[, m] <- tpr[, m]*P/(tpr[, m]*P + fpr[, m]*N)
+  }
+  AUROC <- sapply(1:length(methods), function(m) AUC(c(0,fpr[, m],1), c(0,tpr[, m],1)))
+  AUPR <- sapply(1:length(methods), function(m) AUC(c(0,tpr[, m],1), c(1,precision[, m],0)))
+  
+  # prediction stuff 
+  X_test <- geneexpr_test# [, TFs] # geneexpr_scale_test[, tfs]
+  X_test[, genes[!(genes%in%TFs)]] <- 0
+  prederror <- rep(0, 5)
+  names(prederror) <- c("dogss", "ssep", "sgl", "gglasso", "lasso")
+  precm_errors <- prederror
+  normPM <- norm(prec_matrix, "1")
+  BETA_dogss <- truth_matrix
+  BETA_dogss[, ] <- 0
+  BETA_ssep <- BETA_dogss
+  BETA_sgl <- BETA_dogss
+  BETA_gglasso <- BETA_dogss
+  BETA_lasso <- BETA_dogss
+  
+  for (g in genes) {
+    Y <- geneexpr_test[, g] # geneexpr_center_test[, g]
+    sumY2 <- sum(Y^2)
+    # X <- geneexpr_test[, genes[genes!=g]]
+    # X[, ] <- 0
+    X <- X_test[, genes[genes!=g]]
+    
+    res_dogss <- results_simnetwork[[g]]$results$dogss
+    res_ssep <- results_simnetwork[[g]]$results$ssep
+    res_sgl <- results_simnetwork[[g]]$results$sgl
+    res_lasso <- results_simnetwork[[g]]$results$lasso
+    res_gglasso <- results_simnetwork[[g]]$results$gglasso
+    names(res_dogss$m_cv) <- genes[genes!=g]
+    names(res_ssep$m_cv) <- genes[genes!=g]
+    names(res_sgl$beta) <- genes[genes!=g]
+    BETA_dogss[genes[!(genes %in% g)], g] <- res_dogss$m_cv
+    BETA_ssep[genes[!(genes %in% g)], g] <- res_ssep$m_cv
+    BETA_sgl[genes[!(genes %in% g)], g] <- res_sgl$beta
+    BETA_gglasso[genes[!(genes %in% g)], g] <- res_gglasso$gglasso.fit$beta[, which(res_gglasso$lambda==res_gglasso$lambda.1se)]
+    BETA_lasso[genes[!(genes %in% g)], g] <- res_lasso$glmnet.fit$beta[, which(res_lasso$lambda==res_lasso$lambda.1se)]
+    
+    if (!(g %in% TFs)) {
+      prederror["dogss"] <- prederror["dogss"] + sum((Y-X%*%BETA_dogss[genes!=g, g])^2)/sumY2
+      prederror["ssep"] <- prederror["ssep"] + sum((Y-X%*%BETA_ssep[genes!=g, g])^2)/sumY2
+      prederror["sgl"] <- prederror["sgl"] + sum((Y-X%*%BETA_sgl[genes!=g, g])^2)/sumY2
+      prederror["gglasso"] <- prederror["gglasso"] + sum((Y-X%*%BETA_gglasso[genes!=g, g])^2)/sumY2
+      prederror["lasso"] <- prederror["lasso"] + sum((Y-X%*%BETA_lasso[genes!=g, g])^2)/sumY2
+    }
+    
+    prec_matrices[["dogss"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, genes[!(genes %in% g)]] %*% BETA_dogss[, g][genes[!(genes %in% g)]])^2)
+    prec_matrices[["dogss"]][genes[!(genes %in% g)], g] <- -prec_matrices[["dogss"]][g, g] * BETA_dogss[, g][genes[!(genes %in% g)]]  # minus is important :)
+    
+    prec_matrices[["ssep"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, genes[!(genes %in% g)]] %*% BETA_ssep[, g][genes[!(genes %in% g)]])^2)
+    prec_matrices[["ssep"]][genes[!(genes %in% g)], g] <- -prec_matrices[["ssep"]][g, g] * BETA_ssep[, g][genes[!(genes %in% g)]]  # minus is important :)
+    
+    prec_matrices[["sgl"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, genes[!(genes %in% g)]] %*% BETA_sgl[, g][genes[!(genes %in% g)]])^2)
+    prec_matrices[["sgl"]][genes[!(genes %in% g)], g] <- -prec_matrices[["sgl"]][g, g] * BETA_sgl[, g][genes[!(genes %in% g)]]  # minus is important :)
+    
+    prec_matrices[["gglasso"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, genes[!(genes %in% g)]] %*% BETA_gglasso[, g][genes[!(genes %in% g)]])^2)
+    prec_matrices[["gglasso"]][genes[!(genes %in% g)], g] <- -prec_matrices[["gglasso"]][g, g] * BETA_gglasso[, g][genes[!(genes %in% g)]]  # minus is important :)
+    
+    prec_matrices[["lasso"]][g, g] <- nobs/sum((geneexpr_train[, g] - geneexpr_train[, genes[!(genes %in% g)]] %*% BETA_lasso[, g][genes[!(genes %in% g)]])^2)
+    prec_matrices[["lasso"]][genes[!(genes %in% g)], g] <- -prec_matrices[["lasso"]][g, g] * BETA_lasso[, g][genes[!(genes %in% g)]]  # minus is important :)
+    
+  }
+  prederror <- prederror/length(genes[!(genes%in%TFs)])
+  for (m in methods) {
+    precm_errors[m] <- norm(prec_matrix-prec_matrices[[m]], "1")/normPM
+  } 
+  
+  gr_cl_rd[[1]] <- list(TPR=tpr, FPR=fpr, Prec=precision, AUROC=AUROC, AUPR=AUPR, prederror=prederror, precm_errors=precm_errors, times=times)
+  
+  save(gr_cl_rd, file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/net_gr_cl_rd_", b, ".RData"))
+  
+  load(file=paste0("/project/dogss/tests_thesis/02_networkreconstruction/net_onetwothree_", b, ".RData"))
+  
+  list(onetwothree=onetwothree, gr_cl_rd=gr_cl_rd)
+}
+stopCluster(myCluster)
+save.image(file="/project/dogss/tests_thesis/02_networkreconstruction.RData")
+```
+
+
 ```{r, fig.width=9, fig.heigth=4.2}
   # load("~/Programme/dogss/testing/sim2/finalresults_networksim.RData")
   B <- 100
