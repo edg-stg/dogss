@@ -13,7 +13,7 @@ Edgar Steiger
 -   [Correlation structure](#correlation-structure)
 -   [Slab parameter](#slab-parameter)
 
-This document shows and explains how to use the dogss package and how to reproduce Figures 2 to 8 from the paper (put reference here as a link).
+This document shows and explains how to use the dogss package and how to reproduce Figures 2 to 8 from our paper [Sparse-Group Bayesian Feature Selection Using Expectation Propagation for Signal Recovery and Network Reconstruction](https://arxiv.org/abs/1809.09367).
 
 First we need to load some packages that are required for comparisons and plotting (please install if not available on your machine):
 
@@ -42,7 +42,7 @@ source("../auxiliary_rfunctions/my_cvSGL.R") # proper cross validation for SGL p
 source("../auxiliary_rfunctions/my_theme.R") # functions to adjust ggplots
 ```
 
-Finally, we provide all of the results on our simulated data to reconstruct the plots from the publication. If you wish to re-do all of the simulations/calculations, change the following parameter to **TRUE** (only do this if you have access to multiple cores):
+Finally, we provide all of the results on our simulated data to reconstruct the plots from the publication. If you wish to re-do all of the simulations/calculations, change the following parameter to `TRUE` (only do this if you have access to multiple cores):
 
 ``` r
 selfcompute <- FALSE
@@ -61,9 +61,9 @@ First we set the parameters for simulation:
 m <- 30; p <- 50; nG <- 10; nzG <- 3; k <- 10; sigma0 <- 1
 ```
 
-Here **m** is the number of observations, **p** is the number of features, **nG** is the number of groups, **k** is the number of non-zero coefficients and **sigma0** refers to the noise we will add in the end.
+Here `m` is the number of observations, `p` is the number of features, `nG` is the number of groups, `k` is the number of non-zero coefficients and `sigma0` refers to the noise we will add in the end.
 
-The next chunk will be a function that simulates the data for the linear model **Y=X\*beta+epsilon** with grouped variables. The groups are sampled such that there are exactly **nG** groups (sampling repeated until condition met). The data matrix **X** consists of values sampled from a standard normal distribution. The non-zero entries of the coefficient vector **beta** are sampled from a uniform distribution on (-5,5).
+The next chunk will be a function that simulates the data for the linear model Y = X β + ε with grouped variables. The groups are sampled such that there are exactly `nG` groups (sampling repeated until condition met). The data matrix X consists of values sampled from a standard normal distribution. The non-zero entries of the coefficient vector β are sampled from a uniform distribution on (-5,5).
 
 ``` r
 sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
@@ -83,7 +83,7 @@ sim_signalrecovery <- function(m, p, nG, nzG, k, sigma0) {
 }
 ```
 
-It might happen that we have less than **k** non-zero coefficients if the **nzG** non-zero groups have together less than **k** elements. Here is an example simulation with this function and the parameters defined above:
+It might happen that we have less than `k` non-zero coefficients if the `nzG` non-zero groups have together less than `k` elements. Here is an example simulation with this function and the parameters defined above:
 
 ``` r
 set.seed(7042)
@@ -105,12 +105,12 @@ ggplot(example_signal, aes(colour=G, x=index, ymax=beta, ymin=0)) +
 
 ![](signal_recovery_files/figure-markdown_github/examplesim-1.png)
 
-The plot shows the original coefficient vector **beta** (indexed along the x-axis), every group of coefficients with a separate colour, and the height of a bar gives the value of the coefficient on the y-axis (this is called a needle plot).
+The plot shows the original coefficient vector β (indexed along the x-axis), every group of coefficients with a separate colour, and the height of a bar gives the value of the coefficient on the y-axis (this is called a needle plot).
 
 Comparison of methods - Needle plot
 -----------------------------------
 
-Next we will run six different methods on our simulated data **X**, **Y**, **G** to reconstruct the coefficient vector. Please note that **BSGSSS** because of Gibbs sampling needs a few minutes to run on a standard machine:
+Next we will run six different methods on our simulated data `X`, `Y`, `G` to reconstruct the coefficient vector. Please note that **BSGSSS** because of Gibbs sampling needs a few minutes to run on a standard machine:
 
 ``` r
 if (selfcompute) {
@@ -163,7 +163,7 @@ Three scenarios for feature selection
 
 Now we will consider three different scenarios for the signal recovery (that is, three different sets of parameters). We will repeat the procedure above for all three sets of parameters, but for each set also repeat 100 times and aggregate the results. Aggregation is done along the AUROC and AUPR measure which are based on the rates of truely/falsely recovered edges, see paper for more detailed explanation, and the computing time needed for calculations, as well as the predictive performance on an additional simulated 100 data points with the same vector of coefficients.
 
-**nzG=3** and **sigma0=1** in all three scenarios.
+`nzG=3` and `sigma0=1` in all three scenarios.
 
 ``` r
 nzG <- 3; sigma0 <- 1
@@ -176,7 +176,7 @@ library(foreach)
 library(doParallel)
 ```
 
-Furthermore I specified the number of simulations (**B**) and the number of cores (**ncores**) for the parallelization.
+Furthermore I specified the number of simulations (`B`) and the number of cores (`ncores`) for the parallelization at the beginning of the document.
 
 To generate the data of many simulations with parallelization we will use the following function:
 
@@ -357,7 +357,7 @@ plot_sml <- function(sml) {
 
 ### small
 
-Here **m=30** (number of observations), **p=30** (number of features), **nG=5** (number of groups), **k=5** (number of non-zero coefficients). Figure 3:
+Here `m=30` (number of observations), `p=30` (number of features), `nG=5` (number of groups), `k=5` (number of non-zero coefficients). Figure 3:
 
 ``` r
 plot_sml(1)
@@ -367,7 +367,7 @@ plot_sml(1)
 
 ### medium
 
-Here **m=30** (number of observations), **p=100** (number of features), **nG=20** (number of groups), **k=10** (number of non-zero coefficients). Figure 4:
+Here `m=30` (number of observations), `p=100` (number of features), `nG=20` (number of groups), `k=10` (number of non-zero coefficients). Figure 4:
 
 ``` r
 plot_sml(2)
@@ -377,7 +377,7 @@ plot_sml(2)
 
 ### large
 
-Here **m=10** (number of observations), **p=1000** (number of features), **nG=100** (number of groups), **k=10** (number of non-zero coefficients). Figure 5:
+Here `m=10` (number of observations), `p=1000` (number of features), `nG=100` (number of groups), `k=10` (number of non-zero coefficients). Figure 5:
 
 ``` r
 plot_sml(3)
@@ -574,7 +574,7 @@ grid_arrange_shared_legend(plot_auroc, plot_aupr, plot_prederror, plot_times, nc
 Slab parameter
 --------------
 
-Here we will shortly analyze how the proposed "dogss" method and the simple spike-and-slab approach depend on the slab parameter, which needs to be specified for both methods. To this end, we generate data and apply dogss and ssep with six different values of **sigma\_slab**:
+Here we will shortly analyze how the proposed "dogss" method and the simple spike-and-slab approach depend on the slab parameter, which needs to be specified for both methods. To this end, we generate data and apply dogss and ssep with six different values of `sigma_slab`:
 
 ``` r
 Sigma_slab <- c(0.5, 1, 2, 5, 10, 100)
