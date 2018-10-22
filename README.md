@@ -8,6 +8,10 @@ For more details, see the corresponding publication [Sparse-Group Bayesian Featu
 
 ## Notebooks
 
-We strongly recommend to check out the provided notebook(s) which give an idea what the package is for. Furthermore they give instructions how to reproduce the figures from the paper linked above:
+We strongly recommend to check out the provided notebooks which give an idea what the package is for. Furthermore they give instructions how to reproduce the figures from the paper linked above:
 
-[Signal recovery with dogss (Figures 2-8)](notebooks/signal_recovery/signal_recovery.md)
+* [Signal recovery with dogss (Figures 2-8)](notebooks/signal_recovery/signal_recovery.md)
+
+* [Network reconstruction with dogss: Simulations (Figures 9-13)](notebooks/networks/networks.md)
+
+* [Network reconstruction with dogss: DREAM5 (Figures 14 and 15)](notebooks/networks/networks_dream5.md)
