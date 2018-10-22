@@ -7,7 +7,7 @@ output:
     toc: true
 ---
 
-This document shows and explains how to use the dogss package and how to reproduce Figures 2 to 8 from the paper (put reference here as a link).
+This document shows and explains how to use the dogss package and how to reproduce Figures 2 to 8 from our paper [Sparse-Group Bayesian Feature Selection Using Expectation Propagation for Signal Recovery and Network Reconstruction](https://arxiv.org/abs/1809.09367).
 
 First we need to load some packages that are required for comparisons and plotting (please install if not available on your machine):
 
