@@ -1,11 +1,11 @@
-Network reconstruction with dogss
+Network reconstruction with dogss: Simulations
 ================
 Edgar Steiger
 2018
 
 -   [Simulations](#simulations)
 
-This document shows and explains how to use the dogss package and how to reproduce Figures 9 to 15 from our paper [Sparse-Group Bayesian Feature Selection Using Expectation Propagation for Signal Recovery and Network Reconstruction](https://arxiv.org/abs/1809.09367).
+This document shows and explains how to use the dogss package and how to reproduce Figures 9 to 13 from our paper [Sparse-Group Bayesian Feature Selection Using Expectation Propagation for Signal Recovery and Network Reconstruction](https://arxiv.org/abs/1809.09367).
 
 First we need to load some packages that are required for comparisons and plotting (please install if not available on your machine):
 
@@ -33,7 +33,7 @@ source("../auxiliary_rfunctions/my_cvSGL.R") # proper cross validation for SGL p
 source("../auxiliary_rfunctions/my_theme.R") # functions to adjust ggplots
 ```
 
-Finally, we provide all of the results on our simulated data to reconstruct the plots from the publication. If you wish to re-do all of the simulations/calculations, change the following parameter to **TRUE** (only do this if you have access to multiple cores):
+Finally, we provide all of the results on our simulated data to reconstruct the plots from the publication. If you wish to re-do all of the simulations/calculations, change the following parameter to `TRUE` (only do this if you have access to multiple cores):
 
 ``` r
 selfcompute <- FALSE
