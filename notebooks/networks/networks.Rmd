@@ -7,6 +7,8 @@ output:
     toc: true
 ---
 
+**work in progress**
+
 This document shows and explains how to use the dogss package and how to reproduce Figures 9 to 13 from our paper [Sparse-Group Bayesian Feature Selection Using Expectation Propagation for Signal Recovery and Network Reconstruction](https://arxiv.org/abs/1809.09367).
 
 First we need to load some packages that are required for comparisons and plotting (please install if not available on your machine):
@@ -56,7 +58,7 @@ example network
 
 ## Sim networks
 
-```{r}
+```{r, eval=FALSE}
 library(mvtnorm)
 library(qpgraph)
 library(sparseMVN)
@@ -694,7 +696,7 @@ save.image(file="/project/dogss/tests_thesis/02_networkreconstruction.RData")
 ```
 
 
-```{r, fig.width=9, fig.heigth=4.2}
+```{r, fig.width=9, fig.heigth=4.2, eval=FALSE}
   # load("~/Programme/dogss/testing/sim2/finalresults_networksim.RData")
   B <- 100
   for (i in 1:2) {
@@ -760,7 +762,7 @@ save.image(file="/project/dogss/tests_thesis/02_networkreconstruction.RData")
 
 ## different groupings
 
-```{r, fig.height=4.4, fig.width=13}
+```{r, fig.height=4.4, fig.width=13, eval=FALSE}
   # load("~/Programme/dogss/testing/sim2_grouping_tfs/extra_results_network_grouping.RData")
   # load("/project/dogss/testing/testing/sim2_new/finalresults_sim2_new_area.RData")
   # mydata$method <- factor(mydata$method, ordered=TRUE, levels=c("dogss", "ssep", "sgl", "gglasso", "lasso"))

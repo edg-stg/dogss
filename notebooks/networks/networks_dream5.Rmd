@@ -7,6 +7,8 @@ output:
     toc: true
 ---
 
+**work in progress**
+
 This document shows and explains how to use the dogss package and how to reproduce Figures 14 and 15 from our paper [Sparse-Group Bayesian Feature Selection Using Expectation Propagation for Signal Recovery and Network Reconstruction](https://arxiv.org/abs/1809.09367).
 
 First we need to load some packages that are required for comparisons and plotting (please install if not available on your machine):
@@ -185,7 +187,7 @@ for (j in seq(nobs_train)) {
 }
 ```
 
-```{r figure14, fig.width=9, fig.height=10}
+```{r figure14, fig.width=9, fig.height=10, eval=FALSE}
   load("/project/dogss/tests_thesis/03_dream5_analysis/average_dream5_results_300_1.RData")
 # FPR <- FPR[, 1:4]
 # TPR <- TPR[, 1:4]
@@ -250,7 +252,7 @@ Ed_palette <- Ed_palette_full
 
 
 
-```{r}
+```{r, eval=FALSE}
 myranks <- c(0:2000, 2000+1000*1:18)
 methods <- c("dogss", "ssep", "sgl", "gglasso", "lasso") #
 mynobs_train <- 300 # c(100, 300, 500)
